@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/><meta name="theme-color" content="#fbf1e4"/><title>CATAPULT! — Three Silly Cats</title>
+<style>
+  :root {
+    --cream: #fbf1e4;
+    --ink: #564239;
+    --muted: #66594c;
+    --field-edge: #a8bda9;
+    --track: #dfdaca;
+    --pink: #d4798d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: linear-gradient(155deg,#fbf1e4,#e1e8d7);
+    color: var(--ink);
+    font-family: ui-rounded, "Avenir Next", "Trebuchet MS", "PingFang SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid #476b60; outline-offset: 3px; }
+  .app {
+    --gutter: clamp(10px, 2.4vw, 34px);
+    width: 100%;
+    height: 100svh;
+    min-height: 350px;
+    padding: max(10px, env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: clamp(5px, 1.3vh, 13px);
+  }
+  .hud, .bottom { width: 100%; max-width: 1120px; margin: 0 auto; }
+  .hud { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-height: 53px; }
+  .hud > div:first-child { min-width: 0; }
+  .brand { margin: 3px 0 0; line-height: 0; }
+  .brand img { width: min(100%, clamp(170px, 32vw, 286px)); height: auto; }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    padding: 0;
+    margin: 9px 0 0;
+    list-style: none;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .035em;
+  }
+  .legend li { white-space: nowrap; display: flex; align-items: center; gap: 3px; }
+  .legend img { width: 13px; height: 13px; object-fit: contain; }
+  .legend .star { color: #8a6226; font-size: 14px; line-height: 13px; }
+  .score-block { flex: 0 0 clamp(68px, 22vw, 110px); text-align: right; }
+  .number { font-size: clamp(24px, 6.5vw, 35px); line-height: .98; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .progress { position: relative; height: 5px; margin: 9px 5px 0; border-radius: 99px; background: var(--track); }
+  .progress-fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: #96bab1; transition: width .2s ease; }
+  .progress-paw {
+    position: absolute; right: 0; top: 0; width: 15px; height: 15px;
+    transform: translate(50%, -50%); pointer-events: none; object-fit: contain;
+  }
+  .stage-wrap {
+    width: 100%; min-height: 0; position: relative; overflow: hidden; isolation: isolate;
+    border-radius: clamp(15px, 3vmin, 28px); touch-action: none; text-align: center;
+    max-width: 1400px; margin: 0 auto;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
+  #world { position: absolute; inset: 0; }
+  .overlay { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 20px; background: #e2eadc55; }
+  .overlay[hidden], .story-actions[hidden], .gift[hidden], .tip[hidden] { display: none !important; }
+  .welcome {
+    width: max-content; max-width: 100%; display: grid; justify-items: center; gap: 12px;
+    padding: 16px 19px; border: 1px solid var(--field-edge); border-radius: 18px;
+    background: #fff8ec; box-shadow: 0 4px 14px #46504314;
+  }
+  .welcome p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .action {
+    min-height: 42px; padding: 8px 20px; color: var(--ink); border: 1px solid #a4b29a;
+    border-radius: 99px; background: #d9dfc6; font-weight: 750;
+  }
+  .action:active, .smallbutton:active { transform: translateY(1px); }
+  .secondary { background: #fff9f0; }
+  .bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .state-label { min-width: 0; margin: 0; color: var(--muted); font-size: 12px; font-weight: 700; line-height: 1.4; }
+  .tools { display: flex; gap: 5px; flex-shrink: 0; }
+  .smallbutton {
+    min-width: 44px; min-height: 44px; padding: 5px 9px; font-size: 12px; font-weight: 700;
+    border: 1px solid #bbbea4; border-radius: 12px; color: #514d3d; background: #e8e7d4;
+  }
+  .smallbutton[aria-pressed="false"] { background: transparent; }
+  .icon-button { display: grid; place-items: center; width: 48px; height: 48px; padding: 8px; border: 0; background: #6a7b70; color: #f9eed4; }
+  .smallbutton.icon-button[aria-pressed="false"] { background: #6a7b70; }
+  .icon-button svg { display: block; width: 27px; height: 27px; }
+  .reset-icon svg { width: 24px; height: 24px; }
+  .sound-off-mark { display: none; }
+  #sound[aria-pressed="false"] .sound-off-mark { display: block; }
+  #sound[aria-pressed="false"] .sound-waves { display: none; }
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+  @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
+.floating-score{position:absolute;pointer-events:none;z-index:4;font-size:19px;font-weight:1000;color:#ca8196;text-shadow:0 2px #fff8f3;animation:popaway .85s ease-out forwards}@keyframes popaway{from{opacity:0;transform:translate(-50%,5px) scale(.7)}15%{opacity:1}to{opacity:0;transform:translate(-50%,-45px) scale(1.2)}}
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(156deg,#263848,#182a37);
+    opacity: var(--dusk, 0);
+  }
+  body { isolation: isolate; }
+  .app[data-scene="night"] { color: #f9eed4; }
+  .app[data-scene="dusk"] .legend, .app[data-scene="dusk"] .progress {
+    opacity: calc(1 - var(--dusk, 0));
+  }
+  .app[data-scene="night"] .legend, .app[data-scene="night"] .progress { visibility: hidden; }
+  .brand { position: relative; }
+  .brand .day-logo { opacity: calc(1 - var(--dusk, 0)); }
+  .brand .night-logo { position: absolute; inset: 50% auto auto 0; transform: translateY(-50%); opacity: var(--dusk, 0); aspect-ratio: 50 / 9; object-fit: cover; filter: url(#logo-no-outline); }
+  .app[data-scene="dusk"] .number { color: color-mix(in srgb, #f9eed4 calc(var(--dusk, 0) * 100%), var(--ink)); }
+  .app[data-scene="dusk"] .smallbutton {
+    background: color-mix(in srgb, #334452 calc(var(--dusk, 0) * 100%), #e8e7d4);
+    color: color-mix(in srgb, #f9eed4 calc(var(--dusk, 0) * 100%), #514d3d);
+    border-color: color-mix(in srgb, #82968d calc(var(--dusk, 0) * 100%), #bbbea4);
+  }
+  .app[data-scene="night"] .state-label { color: #f3e8d1; }
+  .app[data-scene="night"] .smallbutton {
+    background: #334452; color: #f9eed4; border-color: #82968d;
+  }
+  .app[data-scene="dusk"] .icon-button { background: color-mix(in srgb, #334452 calc(var(--dusk, 0) * 100%), #6a7b70); color: #f9eed4; }
+  .app[data-phase="gift"] .hud { max-width: 1400px; align-items: center; }
+  .app[data-phase="gift"] .hud > div:first-child { flex: 1 1 auto; }
+  .app[data-phase="gift"] .brand { margin-top: 0; }
+  .app[data-phase="gift"] .brand img { width: min(100%, clamp(152px, 38.4vw, 336px)); }
+  .app[data-phase="gift"] .score-block { flex: 0 0 auto; align-self: center; }
+  .app[data-phase="gift"] .number { font-size: clamp(22.8px, 5.76vw, 50.4px); }
+  .app[data-phase="gift"] .legend, .app[data-phase="gift"] .progress { display: none; }
+  .app[data-scene="night"] :focus-visible { outline-color: #eeddac; }
+  .story-actions {
+    position: absolute; z-index: 3; inset: auto 0 2% 0; display: grid;
+    justify-items: center; gap: 4px; padding: 0 12px; pointer-events: none;
+  }
+  .story-actions button { pointer-events: auto; }
+  .story-caption { color: #fff5df; font-size: 12px; font-weight: 700; }
+  .story-caption:empty { display: none; }
+  .story-actions [hidden], .gift [hidden], .smallbutton[hidden] { display: none; }
+  .hold { touch-action: none; user-select: none; }
+  .blowbar { width: min(42%, 170px); height: 5px; background: #233f50; border-radius: 99px; overflow: hidden; }
+  .blowfill { background: #e8a9ba; height: 100%; width: 0; border-radius: 99px; }
+  .mic-btn {
+    color: #fff5df; min-height: 30px; padding: 3px 8px; font-size: 11px;
+    background: #284c60; border: 1px solid #aec6c4; border-radius: 12px;
+  }
+  .gift {
+    position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; overflow: hidden; padding: 4%; gap: clamp(4px, 2%, 20px);
+    background: linear-gradient(165deg,#304e64,#426780 58%,#2c4d64);
+    color: #fff7e6; animation: reveal .55s ease both;
+  }
+  @keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
+  .birthday-banner {
+    width: min(90%, 720px); position: relative; flex: 0 0 auto;
+  }
+  .birthday-banner img, .birthday-banner .birthday-letters { display: block; width: 100%; height: auto; }
+  .birthday-banner .birthday-letters { touch-action: pan-y; }
+  .birthday-banner .birthday-letters[hidden], .birthday-banner img[hidden] { display: none; }
+  .gallery-space { position: relative; width: 100%; height: 35%; flex: 0 0 auto; overflow: hidden; touch-action: pan-y; cursor: grab; }
+  .orbit-guide {
+    position: absolute; left: 12%; top: 12.7%; width: 76%; height: 74.6%;
+    border: 1px dashed #dacdb868; border-radius: 50%; pointer-events: none;
+  }
+  .artwork {
+    position: absolute; left: 0; top: 0; padding: 0; border: 0; background: transparent;
+    display: grid; place-items: center;
+  }
+  .artwork img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; transform: perspective(760px) translateZ(var(--sink-z, 0px)) rotateX(var(--sink-x, 0deg)) rotateY(var(--sink-y, 0deg)); transition: transform .34s cubic-bezier(.2,.8,.2,1); }
+  .artwork:focus-visible { z-index: 2; }
+  .gift-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; width: 100%; }
+  .gift-controls .music-caption { flex-basis: 100%; text-align: center; font-size: 12px; color: #fff1df; }
+  .gift-controls .action { min-height: 40px; padding: 5px 13px; font-size: 12px; }
+  .gift-controls .audio-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    width: 148px; max-width: 44vw; min-height: 38px; padding: 5px 9px;
+    border: 1px solid #a8c8ca; border-radius: 999px; background: #294b60;
+    color: #fff1df; font-size: 11px; line-height: 1; cursor: pointer;
+  }
+  .audio-pill .audio-icon {
+    flex: 0 0 22px; width: 22px; height: 22px; display: grid; place-items: center;
+    border-radius: 50%; background: #d995aa; color: #fff8ee; font-size: 10px;
+  }
+  .audio-pill .audio-name { flex: 0 0 auto; white-space: nowrap; }
+  .audio-wave { flex: 1 1 auto; min-width: 20px; height: 20px; display: flex; align-items: center; gap: 2px; overflow: hidden; }
+  .audio-wave i { flex: 1 1 0; min-width: 1px; height: 3px; border-radius: 3px; background: #a9cacc; opacity: .7; }
+  .audio-wave i.played { background: #f1b1c2; opacity: 1; }
+  .audio-pill:focus-visible { outline: 2px solid #f8cad6; outline-offset: 3px; }
+  .confetti { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+  .art-view {
+    position: absolute; inset: 0; z-index: 10; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center;
+    min-height: 0; min-width: 0; padding: 52px clamp(10px, 3%, 28px) 12px;
+    background: #112634ed; color: #fff5df;
+  }
+  .art-view[hidden] { display: none; }
+  .art-view img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+  .art-close {
+    position: absolute; right: 8px; top: 5px; width: 44px; height: 44px;
+    border: 1px solid #b7c4b7; border-radius: 50%; background: #384e5b;
+    color: #fff5df; font-size: 26px; line-height: 1;
+  }
+  @media (prefers-reduced-motion: reduce) { .gift { animation-duration: .2s; } }
+</style></head>
+<body><svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs><filter id="logo-no-outline" color-interpolation-filters="sRGB"><feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  2 2 2 0 -2.2" result="light-colors"/><feComposite in="light-colors" in2="SourceGraphic" operator="in"/></filter></defs></svg><main class="app" data-scene="day">
+<header class="hud">
+  <div>
+    <h1 class="brand"><img class="day-logo" src="artwork/ui/main-logo.png" alt="CATAPULT!" width="468" height="72"><img class="night-logo" aria-hidden="true" src="artwork/ui/night-logo-clean.png" alt="" width="300" height="54"></h1>
+    <ul class="legend" aria-label="道具分值">
+      <li><img src="artwork/ui/yarn.png" alt="" aria-hidden="true">毛线球 +15</li>
+      <li><img src="artwork/ui/can.png" alt="" aria-hidden="true">罐头 +35</li>
+      <li><span class="star" aria-hidden="true">✦</span>星星 +75</li>
+    </ul>
+  </div>
+  <div class="score-block">
+    <div class="number"><span class="visually-hidden">分数 </span><span id="score">0</span></div>
+    <div class="progress" aria-hidden="true"><div class="progress-fill" id="progress"><img class="progress-paw" src="artwork/ui/progress-paw.png" alt=""></div></div>
+  </div>
+</header>
+<section class="stage-wrap" id="stage"><canvas id="world" tabindex="0" width="420" height="625" aria-label="三只猫弹射游戏"></canvas>
+<div class="overlay" id="startOverlay">
+  <div class="welcome">
+    <p>把猫咪向后拖，松手弹射。</p>
+    <button class="action" id="start" type="button">开始弹射</button>
+  </div>
+</div>
+<div class="story-actions" id="storyActions" hidden>
+  <div class="story-caption" id="storyCaption" role="status"></div>
+  <button class="action hold" id="nextStory" type="button">按住吹蜡烛</button>
+  <div class="blowbar" id="blowbar" role="progressbar" aria-label="吹蜡烛进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="blowfill" id="blowfill"></div></div>
+  <button class="mic-btn" id="mic" type="button">使用麦克风</button>
+</div>
+<section class="gift" id="gift" aria-label="生日画廊" hidden>
+  <div class="birthday-banner" role="img" aria-label="Happy Birthday">
+    <canvas class="birthday-letters" id="birthdayLetters" width="2000" height="760" aria-hidden="true"></canvas>
+  </div>
+  <div class="gallery-space" id="gallerySpace" tabindex="-1"></div>
+  <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+</section>
+<div class="art-view" role="dialog" hidden id="artView" aria-label="查看画作">
+  <button class="art-close" id="closeArt" type="button" aria-label="关闭画作">×</button>
+  <img id="largeArt" alt="">
+</div>
+</section>
+<footer class="bottom">
+  <p class="state-label" id="stateLabel" role="status"></p>
+  <span class="visually-hidden">当前回合 <span id="round">1</span></span>
+  <div class="tools">
+    <button class="smallbutton" id="nightAudio" type="button" hidden>播放音乐</button>
+    <button class="smallbutton icon-button" id="sound" type="button" aria-pressed="true" aria-label="关闭声音" title="关闭声音">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4z"/><g class="sound-waves"><path d="M16 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a8 8 0 0 1 0 11"/></g><path class="sound-off-mark" d="M2.5 12h19" stroke-width="2.6"/></svg>
+    </button>
+    <button class="smallbutton icon-button reset-icon" id="reset" type="button" aria-label="重来" title="重来"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 1 1-3-6"/><path d="M16.5 2.5v4.3h-4.3"/></svg></button>
+  </div>
+</footer>
+</main>
+
+<script>
+(()=>{'use strict';
+const W=420,H=625, canvas=document.getElementById('world'),ctx=canvas.getContext('2d'),stage=document.getElementById('stage');
+const byId = id => document.getElementById(id);
+const els = {
+  score: byId('score'), progress: byId('progress'), round: byId('round'), state: byId('stateLabel'),
+  start: byId('startOverlay'), story: byId('storyActions'), caption: byId('storyCaption'),
+  next: byId('nextStory'), blowbar: byId('blowbar'), blowfill: byId('blowfill'), mic: byId('mic'),
+  gift: byId('gift'), space: byId('gallerySpace'), confetti: byId('confetti'), view: byId('artView'),
+  largeArt: byId('largeArt'), nightAudio: byId('nightAudio'), giftAudio: byId('giftAudio')
+};
+const src = {
+  cat_a: 'artwork/cats/cat-a.png',
+  cat_b: 'artwork/cats/cat-b.png',
+  cat_c: 'artwork/cats/cat-c.png',
+  can: 'artwork/ui/can.png', canYellow: 'artwork/ui/can-yellow.png', yarn: 'artwork/ui/yarn.png',
+  green_idle: 'artwork/characters/new/me-idle.png', green_cake: 'artwork/characters/new/me-cake-warm.png',
+  green_flame_repair: 'artwork/characters/new/me-cake-warm-flame-repair.png',
+  green_cool: 'artwork/characters/new/me-cake-cool.png',
+  black_idle: 'artwork/characters/new/friend-idle.png', black_hat: 'artwork/characters/new/friend-warm.png',
+  black_cool: 'artwork/characters/new/friend-cool.png',
+  blowReady: 'artwork/characters/new/friend-blow-closed-v2.png',
+  blowing: 'artwork/characters/new/friend-blow-open-v2.png',
+  flame: 'artwork/ui/candle-flame.png'
+};
+const images = {};
+for (const [key, path] of Object.entries(src)) {
+  const image = new Image();
+  image.src = path;
+  images[key] = image;
+}
+const turn = {minimum: .65, timeout: 1.8, impactSpeed: 35};
+const maxPull = 135;
+let fieldWidth = W, fieldHeight = H;
+let impactQuiet = 0, hadImpact = false, lastLaunched = -1;
+let phase='intro',score=0,round=1,ready=true,cats=[],items=[],particles=[],floaters=[],drag=null,roundElapsed=0,stillElapsed=0,phaseTime=0,lastTime=0,soundOn=true,audioCtx=null,seed=7,shotCount=0;
+const colors=['#f6d5d0','#d8ede3','#f9e5bd'];
+function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}function R(a,b){return a+rand()*(b-a);}function clamp(v,a,b){return Math.min(b,Math.max(a,v))}function lerp(a,b,t){return a+(b-a)*t}
+function init(){clearEnding();clearDrag();score=0;round=1;ready=true;items=[];particles=[];floaters=[];drag=null;roundElapsed=0;stillElapsed=0;impactQuiet=0;hadImpact=false;lastLaunched=-1;phase='playing';phaseTime=0;shotCount=0;seed=7;cats=[{x:92/W*fieldWidth,y:420/H*fieldHeight,vx:0,vy:0,spin:0,angle:-.07,r:30,wobble:0,c:'#f4d1cd',img:'cat_a'},{x:297/W*fieldWidth,y:232/H*fieldHeight,vx:0,vy:0,spin:0,angle:.08,r:30,wobble:0,c:'#d5ece2',img:'cat_b'},{x:290/W*fieldWidth,y:483/H*fieldHeight,vx:0,vy:0,spin:0,angle:.01,r:30,wobble:0,c:'#f4e4bf',img:'cat_c'}];for(let i=0;i<10;i++)spawnItem();els.start.hidden=true;updateHUD();}
+function spawnItem(){if(items.length>=16)return false;let level=clamp(Math.max(score/1119,(round-1)/18),0,1);let kind;let z=rand();let starChance=round>=8&&score>=300&&!items.some(o=>o.kind==='star')?.05:0,canChance=.20+level*.33;if(z<starChance)kind='star';else if(z<starChance+canChance)kind='can';else kind='yarn';for(let i=0;i<70;i++){let x=R(42,fieldWidth-42),y=R(80,fieldHeight-45),r=kind==='star'?16:15;if(cats.some(c=>Math.hypot(c.x-x,c.y-y)<c.r+35)||items.some(o=>Math.hypot(o.x-x,o.y-y)<36))continue;items.push({x,y,r,kind,angle:R(-.35,.35),twinkle:R(0,6.28)});return true;}return false;}
+function updateStatus() {
+  let label = '';
+  if (phase === 'playing') label = drag ? '蓄力中 · 松手发射' : ready ? '向后拖动一只猫咪' : '猫咪弹跳中…';
+  if (phase === 'scene') label = '轻触继续';
+  const canvasLabel = phase === 'constellation' ? '按顺序点亮星星，' + nodeCount + ' / ' + nodes.length
+    : phase === 'scene' ? storyLines[storyStep] + ' 按 Enter 继续'
+    : phase === 'cake' ? '生日快乐！' : '三只猫弹射游戏';
+  canvas.setAttribute('aria-label', canvasLabel);
+  if (els.state.textContent !== label) els.state.textContent = label;
+}
+function updateHUD() {
+  els.score.textContent = String(score);
+  els.progress.style.width = (score / 1119 * 100) + '%';
+  els.round.textContent = String(round);
+  stage.closest('.app').dataset.scene = phase === 'night' ? 'dusk' : ['intro', 'playing'].includes(phase) ? 'day' : 'night';
+  stage.closest('.app').dataset.phase = phase;
+  if (phase !== 'night') document.body.style.setProperty('--dusk', ['intro','playing'].includes(phase) ? '0' : '1');
+  updateStatus();
+}
+function sound(freq=430,len=.07,type='sine',vol=.045){if(!soundOn)return;try{audioCtx??=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();let o=audioCtx.createOscillator(),g=audioCtx.createGain(),now=audioCtx.currentTime;o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(vol,now);g.gain.exponentialRampToValueAtTime(.0001,now+len);o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+len+.005)}catch(_){}}
+// A soft synthesized pop and paper rustle works offline.
+function partyPop(){if(!soundOn)return;try{audioCtx??=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();const n=Math.floor(audioCtx.sampleRate*.48),buffer=audioCtx.createBuffer(1,n,audioCtx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<n;i++){const t=i/audioCtx.sampleRate;data[i]=(Math.random()*2-1)*(Math.exp(-t*42)*.65+Math.exp(-t*9)*.12);}const source=audioCtx.createBufferSource(),filter=audioCtx.createBiquadFilter(),gain=audioCtx.createGain();source.buffer=buffer;filter.type='highpass';filter.frequency.value=650;gain.gain.value=.25;source.connect(filter);filter.connect(gain);gain.connect(audioCtx.destination);source.start();}catch(_){}}
+function puff(x,y,color,n=6){for(let i=0;i<n;i++){const ang=R(0,Math.PI*2),v=R(25,135);particles.push({x,y,vx:Math.cos(ang)*v,vy:Math.sin(ang)*v,life:R(.35,.8),max:.8,color,size:R(2.5,5)})}}
+function addScore(item){const value=item.kind==='yarn'?15:item.kind==='can'?35:75;score=Math.min(1119,score+value);floaters.push({x:item.x,y:item.y,t:0,value});puff(item.x,item.y,item.kind==='star'?'#ffdda0':item.kind==='can'?'#c9c6eb':'#f1b7b9',10);sound(item.kind==='star'?740:item.kind==='can'?560:420,.1);updateHUD();if(score>=1119){nodeCount=0;phase='night';phaseTime=0;ready=false;clearDrag();cats.forEach(c=>{c.vx=0;c.vy=0;c.spin=0});updateHUD();}}
+const catSpeed = cat => Math.hypot(cat.vx, cat.vy);
+// The threshold reopens input without zeroing any velocity or changing collision impulses.
+function recordImpact(speed) {
+  if (speed >= turn.impactSpeed) hadImpact = true;
+}
+function canPull(cat) {
+  return cats.includes(cat);
+}
+function simulate(dt){if(phase!=='playing')return;
+ impactQuiet += dt;
+ if(!ready) roundElapsed+=dt;const sub=3,delta=dt/sub;for(let s=0;s<sub;s++){
+ for(const c of cats){c.x+=c.vx*delta;c.y+=c.vy*delta;c.angle+=c.spin*delta;c.vx*=Math.pow(.987,delta*60);c.vy*=Math.pow(.987,delta*60);c.spin*=Math.pow(.980,delta*60);if(Math.abs(c.vx)<1.1)c.vx=0;if(Math.abs(c.vy)<1.1)c.vy=0;const b=20;if(c.x-c.r<b){recordImpact(Math.abs(c.vx));c.x=b+c.r;c.vx=Math.abs(c.vx)*.84;c.spin+=c.vy*.009;c.wobble=.35;sound(200,.035,'triangle',.015)}if(c.x+c.r>fieldWidth-b){recordImpact(Math.abs(c.vx));c.x=fieldWidth-b-c.r;c.vx=-Math.abs(c.vx)*.84;c.spin-=c.vy*.009;c.wobble=.35;}if(c.y-c.r<51){recordImpact(Math.abs(c.vy));c.y=51+c.r;c.vy=Math.abs(c.vy)*.84;c.spin+=c.vx*.009;c.wobble=.35;}if(c.y+c.r>fieldHeight-24){recordImpact(Math.abs(c.vy));c.y=fieldHeight-24-c.r;c.vy=-Math.abs(c.vy)*.84;c.spin-=c.vx*.009;c.wobble=.35;}}
+ for(let a=0;a<cats.length;a++)for(let b=a+1;b<cats.length;b++){let A=cats[a],B=cats[b],dx=B.x-A.x,dy=B.y-A.y,dist=Math.hypot(dx,dy)||.001,minDist=A.r+B.r;if(dist>=minDist)continue;let nx=dx/dist,ny=dy/dist,over=minDist-dist;A.x-=nx*over*.5;A.y-=ny*over*.5;B.x+=nx*over*.5;B.y+=ny*over*.5;let vn=(B.vx-A.vx)*nx+(B.vy-A.vy)*ny;if(vn<0){recordImpact(-vn);let impulse=-(1+.91)*vn/2;A.vx-=nx*impulse;A.vy-=ny*impulse;B.vx+=nx*impulse;B.vy+=ny*impulse;const tangent=(B.vx-A.vx)*(-ny)+(B.vy-A.vy)*nx;A.spin-=tangent*.008;B.spin+=tangent*.008;if(-vn>35){A.wobble=B.wobble=clamp(-vn/530,.26,.9);puff((A.x+B.x)/2,(A.y+B.y)/2,'#fff6de',5);sound(clamp(240+(-vn)*.4,240,620),.055,'triangle',.028);}}}
+ for(const c of cats){for(let i=items.length-1;i>=0;i--){const o=items[i];if(Math.hypot(c.x-o.x,c.y-o.y)<c.r+o.r-3){items.splice(i,1);recordImpact(catSpeed(c));addScore(o);if(phase!=='playing')return;}}}
+ }
+
+ if (!ready) {
+   const hasEligibleCat = cats.some(canPull);
+   if (hasEligibleCat && roundElapsed >= turn.minimum && (hadImpact || roundElapsed >= turn.timeout)) {
+     ready = true;
+     round++;
+     const count = 2 + (score > 400 ? 1 : 0) + (score > 800 ? 1 : 0);
+     for (let i = 0; i < count; i++) spawnItem();
+     if (items.length < 7) for (let i = 0; i < 4; i++) spawnItem();
+     sound(500, .09);
+     updateHUD();
+   }
+ }
+ for(const c of cats)c.wobble=Math.max(0,c.wobble-dt*2.2);
+}
+function updateParticles(dt){for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.life-=dt;if(p.life<=0){particles.splice(i,1);continue}p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=45*dt;p.vx*=.98}for(let i=floaters.length-1;i>=0;i--){floaters[i].t+=dt;if(floaters[i].t>1)floaters.splice(i,1)}}
+function roundRect(x,y,w,h,r,fill){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill()}
+function drawPaper() {
+  const paper = ctx.createLinearGradient(0, 0, fieldWidth, fieldHeight);
+  paper.addColorStop(0, '#e4ecdc');
+  paper.addColorStop(1, '#d8e4d4');
+  roundRect(0, 0, fieldWidth, fieldHeight, 25, paper);
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = '#c2d2bc';
+  for (let x = 23; x < fieldWidth; x += 42) {
+    ctx.beginPath();
+    ctx.arc(x, 10, 13, 0, Math.PI);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, fieldHeight - 10, 13, Math.PI, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.beginPath();
+  ctx.roundRect(2.5, 2.5, fieldWidth - 5, fieldHeight - 5, 23);
+  ctx.strokeStyle = '#9db6a6';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+}
+function drawCat(c) {
+  const pulled = drag && cats[drag.index] === c;
+  const dx = pulled ? drag.dx * .30 : 0, dy = pulled ? drag.dy * .30 : 0;
+  ctx.save();
+  ctx.translate(c.x + dx, c.y + dy);
+  ctx.beginPath();
+  ctx.ellipse(0, c.r * .83, c.r * .91, 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#647b6330';
+  ctx.fill();
+  ctx.rotate(c.angle);
+  const elongation = clamp(Math.hypot(c.vx, c.vy) / 1000, 0, .18);
+  const squash = c.wobble * .23;
+  const pull = pulled ? Math.hypot(drag.dx, drag.dy) / 135 * .09 : 0;
+  ctx.scale(1 + elongation - squash + pull, 1 - elongation + squash - pull);
+  const img = images[c.img];
+  if (img.complete && img.naturalWidth) {
+    const h = 2.28 * c.r, w = h * img.naturalWidth / img.naturalHeight;
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  } else {
+    ctx.beginPath();
+    ctx.arc(0, 0, c.r, 0, Math.PI * 2);
+    ctx.fillStyle = c.c;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+function drawYarn(o) {
+  const img = images.yarn;
+  if (!img.complete || !img.naturalWidth) {
+    roundRect(o.x - 12, o.y - 12, 24, 24, 12, '#d99b7d');
+    return;
+  }
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  ctx.rotate(o.angle * .6);
+  ctx.drawImage(img, -17, -14, 34, 30);
+  ctx.restore();
+}
+function drawCan(o) {
+  const img = o.twinkle < Math.PI ? images.can : images.canYellow;
+  if (!img.complete || !img.naturalWidth) {
+    roundRect(o.x - 15, o.y - 12, 30, 24, 5, '#83a795');
+    return;
+  }
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  ctx.rotate(o.angle * .32);
+  ctx.drawImage(img, -17, -13, 34, 28);
+  ctx.restore();
+}
+function starPath(x,y,r,inner=.45){ctx.beginPath();for(let i=0;i<10;i++){let angle=-Math.PI/2+i*Math.PI/5,rr=i%2?r*inner:r,xp=x+rr*Math.cos(angle),yp=y+rr*Math.sin(angle);i===0?ctx.moveTo(xp,yp):ctx.lineTo(xp,yp)}ctx.closePath()}
+function drawItem(o,t){if(o.kind==='yarn')drawYarn(o,t);else if(o.kind==='can')drawCan(o,t);else{ctx.save();ctx.shadowBlur=12;ctx.shadowColor='#f8d994';starPath(o.x,o.y,16+Math.sin(t*3+o.twinkle)*1.5);ctx.fillStyle='#f6cc78';ctx.fill();ctx.lineWidth=1.7;ctx.strokeStyle='#cfa865';ctx.stroke();ctx.restore()}}
+function drawLaunch() {
+  if (!drag) return;
+  const c = cats[drag.index];
+  const {dx, dy} = drag;
+  const distance = Math.hypot(dx, dy), power = clamp(distance / 135, 0, 1);
+  const x = c.x + dx * .30, y = c.y + dy * .30;
+  ctx.save();
+  ctx.strokeStyle = '#6a9488';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(x, y, 38, 0, Math.PI * 2);
+  ctx.stroke();
+  if (distance >= 12) {
+    const length = 48 + 152 * power;
+    const ux = -dx / distance, uy = -dy / distance;
+    const tipX = x + ux * length, tipY = y + uy * length;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(x + ux * 40, y + uy * 40);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#557d70';
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - ux * 9 - uy * 4, tipY - uy * 9 + ux * 4);
+    ctx.lineTo(tipX - ux * 9 + uy * 4, tipY - uy * 9 - ux * 4);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 38, -Math.PI / 2, -Math.PI / 2 + power * 2 * Math.PI);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#d58e68';
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawParticle(p){ctx.globalAlpha=clamp(p.life/p.max,0,1);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}
+function drawPlaying(t) {
+  drawPaper();
+  for (const item of items) drawItem(item, t);
+  for (const cat of cats) drawCat(cat);
+  for (const p of particles) drawParticle(p);
+  for (const f of floaters) {
+    ctx.globalAlpha = 1 - f.t;
+    ctx.fillStyle = '#995469';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 19px "Avenir Next", sans-serif';
+    ctx.fillText('+' + f.value, f.x, f.y - f.t * 44);
+    ctx.globalAlpha = 1;
+  }
+  drawLaunch();
+}
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const storyLines = ['欸，怎么突然天黑了？', '等等，我好像带了东西。'];
+const viewport = {width: W, height: H, scale: 1, left: 0, top: 0, sceneW: W, sceneH: H, dpr: 1};
+let ground = 505;
+const opening = {me: 108, friend: 292};
+const closeup = {me: 151, friend: 272};
+const nightDuration = 2.1;
+function resizeStage() {
+  const box = stage.getBoundingClientRect();
+  if (!box.width || !box.height) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3, 4096 / Math.max(box.width, box.height));
+
+  const scale = Math.min(box.width / W, box.height / H);
+  const nextWidth = box.width / scale, nextHeight = box.height / scale;
+  if (fieldWidth !== nextWidth || fieldHeight !== nextHeight) {
+    for (const entity of [...cats, ...items]) {
+      entity.x *= nextWidth / fieldWidth;
+      entity.y *= nextHeight / fieldHeight;
+    }
+    fieldWidth = nextWidth;
+    fieldHeight = nextHeight;
+  }
+  Object.assign(viewport, {
+    width: box.width, height: box.height, scale, dpr,
+    left: 0, top: 0, sceneW: nextWidth, sceneH: nextHeight
+  });
+  if (drag && Number.isFinite(drag.clientX) && Number.isFinite(drag.clientY)) {
+    const position = pointer({clientX: drag.clientX, clientY: drag.clientY}, true);
+    drag.startX = position.x - drag.dx;
+    drag.startY = position.y - drag.dy;
+  }
+  for (const surface of [canvas, els.confetti]) {
+    const width = Math.round(box.width * dpr), height = Math.round(box.height * dpr);
+    if (surface.width !== width || surface.height !== height) {
+      surface.width = width;
+      surface.height = height;
+    }
+  }
+  const {sceneW, sceneH} = viewport;
+  const mid = sceneW / 2;
+  const spread = Math.min(132, 92 + (sceneW - W) * .16);
+  opening.me = mid - spread - 10;
+  opening.friend = mid + spread - 10;
+  closeup.me = mid - 71;
+  closeup.friend = mid + 74;
+  ground = Math.min(sceneH - 105, sceneH * .808);
+  if (phase === 'gift') { layoutGift(); }
+}
+const portraits = {
+  green_idle: {footX: 462.5, footY: 1700, scale: .155},
+  green_cake: {footX: 436, footY: 1804, scale: .154},
+  green_cool: {footX: 436, footY: 1802, scale: .1542},
+  black_idle: {footX: 431.5, footY: 1823, scale: .170},
+  black_hat: {footX: 391.5, footY: 2003, scale: .1735},
+  black_cool: {footX: 391.5, footY: 2003, scale: .1735},
+  blowReady: {footX: 405.5, footY: 1896, scale: .182},
+  blowing: {footX: 405.5, footY: 1896, scale: .182}
+};
+
+// Set paths here when a recording or additional hand-drawn pose is ready.
+const endingAssets = {
+  starryBgm: 'assets/audio/starry_bgm.mp3',
+  birthdayFlute: 'assets/audio/birthday-part1.m4a',
+  birthdaySecond: 'assets/audio/birthday-part2.m4a',
+  musicBox: 'assets/audio/birthday-musicbox.m4a',
+  partyPop: 'assets/audio/party-popper.m4a'
+};
+const art = [
+  ['friend-color', '人物侧脸'],
+  ['cat-art-01', '圆脸小猫'],
+  ['cat-art-02', '背影小猫'],
+  ['cat-art-03', '小猫侧脸'],
+  ['cat-art-04', '两只小猫']
+];
+const starry = new Audio();
+const musicBox = new Audio();
+const ukulele = new Audio();
+const popTrack = new Audio();
+popTrack.src = endingAssets.partyPop; popTrack.preload = 'auto';
+musicBox.src = endingAssets.musicBox; musicBox.loop = true; musicBox.volume = .35;
+ukulele.src = endingAssets.birthdaySecond;
+const birthday = new Audio();
+starry.preload = birthday.preload = 'none';
+starry.loop = true;
+if (endingAssets.starryBgm) starry.src = endingAssets.starryBgm;
+if (endingAssets.birthdayFlute) birthday.src = endingAssets.birthdayFlute;
+let birthdayAvailable = Boolean(endingAssets.birthdayFlute);
+let birthdayPart = 0;
+let musicGeneration = 0;
+let storyStep = 0, nodeCount = 0, blow = 0, blowTime = 0, holding = false;
+let dialogueEffect = null;
+let previewLockedCake = false;
+let micRequest = 0, micStream = null, micAnalyser = null, micCtx = null, micSamples = null;
+let orbitTime = 0, openCard = null, paper = [], giftAudioStarted = false, popPlayed = false;
+const paperCtx = els.confetti.getContext('2d');
+
+// Scorpius follows the layered reference. The selected checkpoints keep the original seven taps.
+const starPoints = [
+  [127, 347], [98, 371], [88, 407], [113, 431], [156, 436], [198, 410],
+  [222, 359], [233, 311], [240, 266], [282, 225], [330, 195],
+  [362, 170], [323, 133], [348, 244]
+];
+const checkpoints = [0, 2, 4, 6, 8, 9, 10];
+const nodes = checkpoints.map(index => starPoints[index]);
+function constellationLayout() {
+  const {sceneW, sceneH} = viewport;
+  const scale = Math.min(1.28, 1 + (sceneW - W) / 1100);
+  return {scale, x: sceneW / 2 - 225 * scale, y: sceneH / 2 - 285 * scale};
+}
+function constellationTarget() {
+  const [x, y] = nodes[nodeCount];
+  const layout = constellationLayout();
+  return [layout.x + x * layout.scale, layout.y + y * layout.scale];
+}
+
+function smooth(value) {
+  const p = clamp(value, 0, 1);
+  return p * p * (3 - 2 * p);
+}
+function drawSky(story = false, stars = 1) {
+  const {sceneW: w, sceneH: h} = viewport;
+  const fill = ctx.createLinearGradient(0, 0, 0, h);
+  fill.addColorStop(0, story ? '#345773' : '#1e2c3a');
+  fill.addColorStop(.63, story ? '#62849e' : '#253846');
+  fill.addColorStop(1, story ? '#9aafb9' : '#1e2d38');
+  ctx.fillStyle = fill;
+  ctx.fillRect(0, 0, w, h);
+  if (stars > 0) drawSkyStars(story, stars);
+  if (story) {
+    ctx.fillStyle = '#42677d';
+    ctx.beginPath();
+    ctx.moveTo(0, ground + 19);
+    ctx.quadraticCurveTo(w / 2, ground - 83, w, ground + 19);
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fill();
+    // The original scene has two small tufts where the hill meets the sky.
+    for (const side of [1, -1]) {
+      const x = side === 1 ? w * .12 : w * .90;
+      const y = ground + 19 - 204 * (x / w) * (1 - x / w);
+      ctx.save();
+      ctx.translate(x, y + 2);
+      ctx.scale(side, 1);
+      ctx.fillStyle = '#42677d';
+      for (const [dx, angle, size] of [[-7, -.8, 8], [0, -.25, 11], [7, .7, 8]]) {
+        ctx.save(); ctx.translate(dx, -4); ctx.rotate(angle);
+        ctx.beginPath(); ctx.ellipse(0, -size * .4, 3.4, size, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      ctx.restore();
+    }
+  }
+}
+function drawSkyStars(story, alpha) {
+  const {sceneW: w, sceneH: h} = viewport;
+  if (story) {
+    // Four scattered stars echo the original art; avoid the accidental diagonal row.
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+    ctx.fillStyle = '#f5e7c5';
+    for (const [x, y, r] of [[.145,.15,3.1],[.52,.075,2.3],[.88,.215,2.3],[.085,.36,2.1]]) {
+      ctx.beginPath();
+      ctx.moveTo(x*w, y*h-r); ctx.quadraticCurveTo(x*w+r*.2, y*h-r*.2, x*w+r, y*h);
+      ctx.quadraticCurveTo(x*w+r*.2, y*h+r*.2, x*w, y*h+r);
+      ctx.quadraticCurveTo(x*w-r*.2, y*h+r*.2, x*w-r, y*h);
+      ctx.quadraticCurveTo(x*w-r*.2, y*h-r*.2, x*w, y*h-r); ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+  const count = story ? 21 : 38;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  for (let i = 0; i < count; i++) {
+    const random = n => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+    const x = 20 + random(i * 2 + 1) * (w - 40);
+    const y = 24 + random(i * 2 + 2) * (story ? ground - 95 : h - 73);
+    ctx.fillStyle = i % 5 === 0 ? '#f8e6b990' : '#e7e7cf47';
+    ctx.beginPath();
+    ctx.arc(x, y, i % 5 === 0 ? 1.5 : .75, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+function traceStars(through, complete = false, dots = false) {
+  ctx.save();
+  ctx.strokeStyle = '#9dc8b5d9';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(...starPoints[0]);
+  for (let i = 1; i <= through; i++) ctx.lineTo(...starPoints[i]);
+  if (complete) {
+    for (const tip of starPoints.slice(11)) {
+      ctx.moveTo(...starPoints[10]);
+      ctx.lineTo(...tip);
+    }
+  }
+  ctx.stroke();
+  for (let i = 0; i < starPoints.length; i++) {
+    const [x, y] = starPoints[i];
+    const lit = i <= through || complete;
+    ctx.fillStyle = lit ? (i === 9 ? '#f3a89f' : '#ffecc7') : '#c1d5c67a';
+    ctx.shadowColor = lit ? '#ffe2a3' : 'transparent';
+    ctx.shadowBlur = lit ? 8 : 0;
+    if (dots) { ctx.beginPath(); ctx.arc(x, y, lit ? 2.3 : 1, 0, Math.PI * 2); }
+    else starPath(x, y, lit ? (i === 9 ? 7 : 5.3) : 2.3, .54);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+function drawConstellation(t, alpha = 1) {
+  const {sceneW: w, sceneH: h} = viewport;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = '#91ac9d';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.roundRect(2, 2, w - 4, h - 4, 23);
+  ctx.stroke();
+  const complete = nodeCount === nodes.length;
+  const map = constellationLayout();
+  ctx.save();
+  ctx.translate(map.x, map.y);
+  ctx.scale(map.scale, map.scale);
+  traceStars(nodeCount ? checkpoints[nodeCount - 1] : -1, complete);
+  if (!complete) {
+    const [x, y] = nodes[nodeCount];
+    const radius = reducedMotion.matches ? 9 : 9 + 1.65 * Math.sin(t * 5);
+    ctx.save();
+    ctx.strokeStyle = '#ffebc0';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowColor = '#f5dca0';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#fff4d3';
+    starPath(x, y, 6, .54);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff0d5';
+  ctx.font = 'bold 19px "Avenir Next", sans-serif';
+  ctx.fillText('Connect Stars', w / 2, 52);
+  ctx.font = '14px "Avenir Next", sans-serif';
+  ctx.fillStyle = '#ede5d3';
+  ctx.fillText('按顺序点击星星', w / 2, 77);
+  ctx.font = 'bold 15px "Avenir Next", sans-serif';
+  ctx.fillText(nodeCount + ' / ' + nodes.length, w / 2, h - 28);
+  ctx.restore();
+}
+function lightNextStar() {
+  nodeCount++;
+  sound(390 + nodeCount * 70, .13);
+  updateStatus();
+  if (nodeCount === nodes.length) {
+    phase = 'connected';
+    phaseTime = 0;
+  }
+}
+function storySprite(key, foot) {
+  const img = images[key], {footX, footY, scale} = portraits[key];
+  return {img, x: foot - footX * scale, y: ground - footY * scale,
+    w: img.naturalWidth * scale, h: img.naturalHeight * scale};
+}
+function drawPaperFlip(r, rise, angle) {
+  const axis = r.x + r.w * .53;
+  const midY = r.y + r.h * .5 - rise;
+  const focal = r.h * 2.1;
+  const cosine = Math.cos(angle), sine = Math.sin(angle);
+  if (Math.abs(cosine) < .009) {
+    ctx.drawImage(r.img, axis - .35, midY - r.h / 2, .7, r.h);
+    return;
+  }
+  const count = 72;
+  // Project adjacent strips around the same vertical axis. Negative cosine draws the reverse face.
+  for (let i = 0; i < count; i++) {
+    const u0 = r.w * (i / count - .53);
+    const u1 = u0 + r.w / count;
+    const z0 = focal / (focal + u0 * sine), z1 = focal / (focal + u1 * sine);
+    const x0 = axis + u0 * cosine * z0, x1 = axis + u1 * cosine * z1;
+    const height = r.h * (z0 + z1) / 2;
+    ctx.save();
+    ctx.translate(x0, midY - height / 2);
+    ctx.scale(Math.sign(cosine), 1);
+    const sourceWidth = r.img.naturalWidth / count;
+    const width = Math.abs(x1 - x0);
+    ctx.drawImage(r.img, i * sourceWidth, 0, sourceWidth, r.img.naturalHeight,
+      0, 0, width + (width > .4 ? .28 : 0), height);
+    ctx.restore();
+  }
+}
+const lightBuffer = document.createElement('canvas');
+const lightCtx = lightBuffer.getContext('2d');
+const coolPortraits = new Map();
+let warmHairPatch = null;
+function repairedWarmHair() {
+  const image = images.green_flame_repair;
+  if (!image || !image.naturalWidth) return null;
+  if (warmHairPatch) return warmHairPatch;
+  const patch = document.createElement('canvas');
+  patch.width = 110; patch.height = 116;
+  const p = patch.getContext('2d');
+  p.drawImage(image, 628, 590, 110, 116, 0, 0, 110, 116);
+  p.globalCompositeOperation = 'destination-in';
+  p.save(); p.translate(55, 58); p.scale(55, 58);
+  const mask = p.createRadialGradient(0, 0, 0, 0, 0, 1);
+  mask.addColorStop(0, '#fff'); mask.addColorStop(.78, '#fff'); mask.addColorStop(1, 'transparent');
+  p.fillStyle = mask; p.fillRect(-1, -1, 2, 2); p.restore();
+  p.globalCompositeOperation = 'source-over';
+  warmHairPatch = patch;
+  return patch;
+}
+function drawPortrait(key, foot, motion = {}, candle = null) {
+  const r = storySprite(key, foot);
+  if (!r.w) return;
+  const {squash = 0, rise = 0, flip = 0} = motion;
+  if (flip) {
+    drawPaperFlip(r, rise, flip);
+    return;
+  }
+  if (!candle) {
+    ctx.save();
+    ctx.translate(foot, ground - rise);
+    ctx.scale(1 + squash * .6, 1 - squash);
+    if (phase === 'scene' || phase === 'hop') {
+      if (!coolPortraits.has(key)) {
+        const surface = document.createElement('canvas');
+        surface.width = r.img.naturalWidth; surface.height = r.img.naturalHeight;
+        const tint = surface.getContext('2d');
+        tint.drawImage(r.img, 0, 0);
+        tint.globalCompositeOperation = 'source-atop';
+        tint.fillStyle = 'rgba(46, 110, 150, .09)';
+        tint.fillRect(0, 0, surface.width, surface.height);
+        coolPortraits.set(key, surface);
+      }
+      ctx.drawImage(coolPortraits.get(key), r.x - foot, r.y - ground, r.w, r.h);
+    } else ctx.drawImage(r.img, r.x - foot, r.y - ground, r.w, r.h);
+    ctx.restore();
+    return;
+  }
+  const dpr = Math.max(1, viewport.scale * viewport.dpr);
+  const w = Math.ceil(r.w * dpr), h = Math.ceil(r.h * dpr);
+  if (lightBuffer.width < w) lightBuffer.width = w;
+  if (lightBuffer.height < h) lightBuffer.height = h;
+  lightCtx.clearRect(0, 0, w, h);
+  lightCtx.drawImage(r.img, 0, 0, w, h);
+  if (key === 'green_cake') {
+    // Replace only the old baked-in flame with a feathered, warm-lit repair.
+    const patch = repairedWarmHair();
+    if (patch) lightCtx.drawImage(patch, 0, 0, 110, 116, 628 / 872 * w, 590 / 1804 * h, 110 / 872 * w, 116 / 1804 * h);
+    else lightCtx.drawImage(r.img, 602, 608, 46, 78, 654 / 872 * w, 608 / 1804 * h, 55 / 872 * w, 78 / 1804 * h);
+  }
+  // Keep the lighting inside the original silhouette and leave the sky untouched.
+  lightCtx.globalCompositeOperation = 'source-atop';
+  lightCtx.fillStyle = 'rgba(42,74,119,' + candle.cool * .27 + ')';
+  lightCtx.fillRect(0, 0, w, h);
+  const x = (candle.x - r.x) * dpr, y = (candle.y - 13 - r.y) * dpr;
+  const glow = lightCtx.createRadialGradient(x, y, 0, x, y, 144 * dpr);
+  glow.addColorStop(0, 'rgba(255,177,80,' + candle.light * .06 + ')');
+  glow.addColorStop(.57, 'rgba(255,185,101,' + candle.light * .02 + ')');
+  glow.addColorStop(1, 'rgba(255,185,101,0)');
+  lightCtx.fillStyle = glow;
+  lightCtx.fillRect(0, 0, w, h);
+  lightCtx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(lightBuffer, 0, 0, w, h, r.x, r.y, r.w, r.h);
+}
+function dialogueBox(cake = false) {
+  const w = cake ? 126 : 192;
+  const portrait = portraits[cake ? 'green_cake' : 'green_idle'];
+  return {x: clamp((cake ? closeup.me : opening.me) - w / 2, 13, viewport.sceneW - w - 13), y: Math.max(5, ground - portrait.footY * portrait.scale - 62), w};
+}
+function paintDialogue(x, y, w, text) {
+  roundRect(x, y, w, 38, 18, '#faedcf');
+  ctx.fillStyle = '#faedcf';
+  ctx.beginPath();
+  ctx.moveTo(x + w * .56, y + 35);
+  ctx.lineTo(x + w * .73, y + 34);
+  ctx.lineTo(x + w * .67, y + 46);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#4f433c';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 15px "PingFang SC", sans-serif';
+  ctx.fillText(text, x + w / 2, y + 24);
+}
+function drawDialogue(cake = false) {
+  const {x, y, w} = dialogueBox(cake);
+  if (!cake && dialogueEffect && !reducedMotion.matches) {
+    const time = dialogueEffect.time;
+    if (time < .22) {
+      const p = smooth(time / .22);
+      // Four paper-like pieces separate from the old dialogue.
+      const pieces = [
+        [[0,0],[.55,0],[.49,.25],[.53,.48],[.45,.54],[0,.50]],
+        [[.55,0],[1,0],[1,.50],[.58,.54],[.53,.48],[.49,.25]],
+        [[0,.50],[.45,.54],[.53,.48],[.49,.73],[.45,1],[0,1]],
+        [[.53,.48],[.58,.54],[1,.50],[1,1],[.45,1],[.49,.73]]
+      ];
+      for (const [i, shape] of pieces.entries()) {
+        ctx.save();
+        ctx.globalAlpha *= 1 - p;
+        ctx.translate((i % 2 ? 9 : -9) * p, (i < 2 ? -5 : 8) * p);
+        ctx.beginPath();
+        shape.forEach(([px, py], n) => n ? ctx.lineTo(x + w*px, y + 46*py) : ctx.moveTo(x + w*px, y + 46*py));
+        ctx.closePath();
+        ctx.clip();
+        paintDialogue(x, y, w, dialogueEffect.oldText);
+        ctx.restore();
+      }
+    }
+    const appear = smooth((time - .10) / .24);
+    if (appear > 0) {
+      ctx.save(); ctx.globalAlpha *= appear;
+      ctx.translate(x + w/2, y + 23); ctx.scale(.92 + .08*appear, .92 + .08*appear);
+      paintDialogue(-w/2, -23, w, storyLines[storyStep]);
+      ctx.restore();
+    }
+  } else paintDialogue(x, y, w, cake ? '生日快乐！' : storyLines[storyStep]);
+}
+function drawStory(t) {
+  drawSky(true);
+  ctx.save();
+  const airy = Math.min(1.19, 1 + (viewport.sceneW - W) / 2000);
+  ctx.translate(viewport.sceneW / 2 - 146 * airy + (viewport.sceneW - W) * .075, ground - 482);
+  ctx.scale(.61 * airy, .40 * airy);
+  traceStars(10, true, true);
+  ctx.restore();
+
+  const moving = phase === 'hop';
+  const showingCake = phase === 'cake' || phase === 'extinguish';
+  const approach = moving && !reducedMotion.matches ? smooth((phaseTime - 1.10) / .64) : +showingCake;
+  const me = lerp(opening.me, closeup.me, approach);
+  const friend = lerp(opening.friend, closeup.friend, approach);
+  const motion = {squash: 0, rise: 0, flip: 0};
+  if (moving && !reducedMotion.matches) {
+    const time = phaseTime;
+    const air = clamp((time - .14) / .73, 0, 1);
+    motion.rise = 72 * Math.sin(Math.PI * air);
+    motion.flip = air > 0 && air < 1 ? Math.PI * 2 * smooth(clamp((air - .08) / .84, 0, 1)) : 0;
+    motion.squash = time <= .14 ? .085 * Math.sin(Math.PI * time / .14)
+      : time > .87 && time < 1.10 ? .09 * Math.sin(Math.PI * (time - .87) / .23) : 0;
+  }
+  ctx.fillStyle = '#223f5355';
+  for (const [foot, height] of [[me, motion.rise], [friend, 0]]) {
+    ctx.beginPath();
+    ctx.ellipse(foot, ground - 1, 43 - height * .12, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  let flameX, flameY, light = 0;
+  if (showingCake) {
+    const r = storySprite('green_cake', me);
+    flameX = r.x + 683 * portraits.green_cake.scale;
+    flameY = r.y + 688 * portraits.green_cake.scale;
+    light = phase === 'extinguish' ? 1 - smooth(phaseTime / .48)
+      : smooth(phaseTime / .32);
+  }
+  const candle = showingCake ? {x: flameX, y: flameY, light, cool: phase === 'extinguish' ? smooth(phaseTime / .48) : 0} : null;
+  const breathCycle = blowTime * Math.PI * 4;
+  const actionPose = blowTime < .23 ? 'blowing' : 'blowReady';
+  const friendKey = showingCake
+    ? ((blowTime > 0 || phase === 'extinguish') && images[actionPose]?.naturalWidth ? actionPose : 'black_hat')
+    : 'black_idle';
+  if (!showingCake) drawPortrait('green_idle', me, motion);
+  const coolMix = phase === 'extinguish' ? smooth(phaseTime / .65) : 0;
+  ctx.save(); ctx.globalAlpha *= 1 - coolMix;
+  drawPortrait(friendKey, friend, {}, candle);
+  if (showingCake) drawPortrait('green_cake', me, {}, candle);
+  ctx.restore();
+  if (coolMix > 0) {
+    ctx.save(); ctx.globalAlpha *= coolMix;
+    drawPortrait('black_cool', friend);
+    drawPortrait('green_cool', me);
+    ctx.restore();
+  }
+  if (showingCake && light > 0) {
+    ctx.save();
+    ctx.translate(flameX, flameY);
+    // Closed-mouth frame: keep the flame visibly tilted left as requested.
+    const lean = blowTime > 0 && actionPose === 'blowReady' ? -.38 - .16 * smooth(blow) : -.54 * smooth(blow);
+    ctx.rotate(lean + (reducedMotion.matches ? 0 : blowTime ? Math.sin(breathCycle) * .08 : Math.sin(t * 3) * .05));
+    const size = phase === 'extinguish' ? 0 : smooth(phaseTime / .25);
+    if (size > 0 && images.flame.naturalWidth) {
+      ctx.globalAlpha = Math.min(1, size * 5);
+      ctx.shadowBlur = 15 * light;
+      ctx.shadowColor = '#ffca7f';
+      ctx.drawImage(images.flame, -5 * size, -15 * size, 10 * size, 16 * size);
+    }
+    ctx.restore();
+  }
+  if (phase === 'scene' || phase === 'cake') drawDialogue(showingCake);
+  if (phase === 'hop' && reducedMotion.matches) {
+    ctx.fillStyle = 'rgba(29,44,57,' + smooth(phaseTime / .22) + ')';
+    ctx.fillRect(0, 0, viewport.sceneW, viewport.sceneH);
+  }
+  if (phase === 'cake' && reducedMotion.matches && phaseTime < .22) {
+    ctx.fillStyle = 'rgba(29,44,57,' + (1 - smooth(phaseTime / .22)) + ')';
+    ctx.fillRect(0, 0, viewport.sceneW, viewport.sceneH);
+  }
+  if (phase === 'scene' && phaseTime < .46 && !reducedMotion.matches) {
+    ctx.fillStyle = 'rgba(29,44,57,' + (1 - smooth(phaseTime / .46)) + ')';
+    ctx.fillRect(0, 0, viewport.sceneW, viewport.sceneH);
+  }
+  if (phase === 'extinguish') {
+    ctx.fillStyle = 'rgba(18,34,46,' + .36 * smooth((phaseTime - 1.45) / .25) + ')';
+    ctx.fillRect(0, 0, viewport.sceneW, viewport.sceneH);
+  }
+}
+const wavePlayers = [];
+for (const player of wavePlayers) {
+  player.wave = player.button.querySelector('.audio-wave');
+  player.bars = Array.from({length: 20}, () => {
+    const bar = document.createElement('i'); player.wave.append(bar); return bar;
+  });
+}
+function syncGiftAudio() {
+  for (const {button, track, name, bars} of wavePlayers) {
+    const playing = !track.paused;
+    button.querySelector('.audio-icon').textContent = playing ? '❚❚' : '▶';
+    button.setAttribute('aria-label', (playing ? '暂停' : '播放') + name);
+    button.setAttribute('aria-pressed', String(playing));
+    const progress = Number.isFinite(track.duration) && track.duration > 0 ? track.currentTime / track.duration : 0;
+    bars.forEach((bar, i) => bar.classList.toggle('played', (i + 1) / bars.length <= progress));
+  }
+}
+async function loadWaveform(player) {
+  if (player.wavePromise) return player.wavePromise;
+  player.wavePromise = (async () => {
+    const Context = window.AudioContext || window.webkitAudioContext;
+    if (!Context) return;
+    audioCtx ??= new Context();
+    const response = await fetch(player.track.src);
+    if (!response.ok) throw new Error('Audio unavailable');
+    const buffer = await audioCtx.decodeAudioData(await response.arrayBuffer());
+    const values = player.bars.map((_, index) => {
+      const start = Math.floor(index * buffer.length / player.bars.length);
+      const end = Math.floor((index + 1) * buffer.length / player.bars.length);
+      let sum = 0, count = 0;
+      for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+        const samples = buffer.getChannelData(channel);
+        for (let n = start; n < end; n += 32) { sum += samples[n] * samples[n]; count++; }
+      }
+      return Math.sqrt(sum / Math.max(1, count));
+    });
+    const peak = Math.max(...values, .001);
+    player.bars.forEach((bar, i) => { bar.style.height = (3 + 16 * Math.sqrt(values[i] / peak)) + 'px'; });
+  })().catch(() => { player.wavePromise = null; });
+  return player.wavePromise;
+}
+for (const player of wavePlayers) {
+  for (const type of ['play', 'pause', 'timeupdate', 'ended']) player.track.addEventListener(type, syncGiftAudio);
+  player.button.addEventListener('click', () => { void loadWaveform(player); });
+}
+birthday.addEventListener('ended', () => {
+  syncGiftAudio();
+});
+birthday.addEventListener('error', () => {
+  birthdayAvailable = false;
+  syncGiftAudio();
+});
+starry.addEventListener('error', () => { els.nightAudio.hidden = true; });
+function playTrack(track, fallback) {
+  if (!soundOn || !track.getAttribute('src') || track.error) return;
+  const generation = musicGeneration;
+  track.play().then(() => {
+    if (generation !== musicGeneration) return;
+    if (track === birthday) syncGiftAudio();
+    else fallback.hidden = true;
+  }).catch(() => {
+    if (generation !== musicGeneration || !soundOn || track.error) return;
+    const relevant = track === birthday ? phase === 'gift' : ['scene', 'hop', 'cake'].includes(phase);
+    if (relevant) fallback.hidden = false;
+  });
+}
+function stopMic() {
+  micRequest++;
+  if (micStream) micStream.getTracks().forEach(track => track.stop());
+  micCtx?.close().catch(() => {});
+  micStream = micAnalyser = micCtx = micSamples = null;
+}
+function clearEnding() {
+  musicGeneration++;
+  stopMic();
+  birthdayPart = 0;
+  birthday.src = endingAssets.birthdayFlute;
+  for (const track of [starry, birthday, ukulele, musicBox, popTrack]) {
+    track.pause();
+    if (track.readyState) track.currentTime = 0;
+  }
+  closeViewer(false);
+  els.nightAudio.hidden = true;
+  els.story.hidden = els.gift.hidden = true;
+  holding = false;
+  paper = [];
+}
+function enterConstellation() {
+  phase = 'constellation';
+  phaseTime = nodeCount = 0;
+  canvas.focus({preventScroll: true});
+  updateHUD();
+}
+function enterScene() {
+  phase = 'scene';
+  phaseTime = storyStep = 0;
+  dialogueEffect = null;
+  starry.volume = .46;
+  playTrack(starry, els.nightAudio);
+  canvas.focus({preventScroll: true});
+  updateHUD();
+}
+function advanceStory() {
+  if (phase !== 'scene') return;
+  if (storyStep < storyLines.length - 1) {
+    dialogueEffect = reducedMotion.matches ? null : {oldText: storyLines[storyStep], time: 0};
+    storyStep++;
+    updateStatus();
+    sound(580, .07);
+    return;
+  }
+  phase = 'hop';
+  phaseTime = 0;
+  updateStatus();
+}
+function enterCake() {
+  phase = 'cake';
+  phaseTime = blow = blowTime = 0;
+  previewLockedCake = false;
+  if (starry.paused) playTrack(starry, els.nightAudio);
+  holding = false;
+  els.story.hidden = false;
+  els.caption.textContent = '';
+  els.mic.disabled = false;
+  els.mic.textContent = '使用麦克风';
+  updateBlowProgress();
+  updateHUD();
+}
+function updateBlowProgress() {
+  const percent = Math.round(blow * 100);
+  els.blowfill.style.width = percent + '%';
+  els.blowbar.setAttribute('aria-valuenow', String(percent));
+}
+function extinguish() {
+  phase = 'extinguish';
+  phaseTime = 0;
+  stopMic();
+  holding = false;
+  els.nightAudio.hidden = els.story.hidden = true;
+  updateStatus();
+}
+function micIsBlowing() {
+  if (!micAnalyser) return false;
+  micAnalyser.getByteTimeDomainData(micSamples);
+  let square = 0;
+  for (const sample of micSamples) square += ((sample - 128) / 128) ** 2;
+  return Math.sqrt(square / micSamples.length) > .072;
+}
+function updateCake(dt) {
+  starry.volume = lerp(.46, .23, smooth(phaseTime / .45));
+  if (previewLockedCake && !holding) return;
+  previewLockedCake = false;
+  const mic = micIsBlowing();
+  if (holding || mic) {
+    blowTime += dt;
+    blow = clamp(blow + dt * (holding ? .51 : .57), 0, 1);
+    updateBlowProgress();
+  } else {
+    blowTime = 0;
+  }
+  if (blow === 1) extinguish();
+}
+function makeGallery() {
+  return art.map(([key, label]) => {
+    const button = document.createElement('button');
+    button.className = 'artwork';
+    button.type = 'button';
+    button.setAttribute('aria-label', '放大' + label);
+    const image = new Image();
+    image.alt = label;
+    image.src = 'artwork/gallery/' + key + '-thumb.jpg';
+    button.append(image);
+    button.addEventListener('pointermove', e => {
+      if (e.pointerType !== 'mouse' || galleryDrag?.moved || reducedMotion.matches) return;
+      const r = button.getBoundingClientRect();
+      const x = clamp((e.clientX - r.left) / r.width * 2 - 1, -1, 1);
+      const y = clamp((e.clientY - r.top) / r.height * 2 - 1, -1, 1);
+      button.style.setProperty('--sink-x', (-y * 8) + 'deg');
+      button.style.setProperty('--sink-y', (x * 8) + 'deg');
+      button.style.setProperty('--sink-z', '-10px');
+    });
+    button.addEventListener('pointerleave', () => { for (const v of ['--sink-x','--sink-y','--sink-z']) button.style.removeProperty(v); });
+    els.space.append(button);
+    button.addEventListener('click', () => {
+      if (!els.view.hidden) return;
+      openCard = button;
+      els.largeArt.alt = label;
+      els.largeArt.src = 'artwork/gallery/' + key + '.jpg';
+      els.view.hidden = false;
+      els.gift.inert = true;
+      els.view.setAttribute('aria-label', '查看' + label);
+      byId('closeArt').focus();
+    });
+    return button;
+  });
+}
+let galleryCards;
+let galleryTurn = 0, galleryTarget = 0, galleryVelocity = 0, galleryDrag = null, gallerySuppressClick = false;
+const letterCanvas = byId('birthdayLetters');
+const letterCtx = letterCanvas.getContext('2d');
+const letterWidth = 2000;
+let letterHeight = 760, portraitLetters = false;
+// The supplied PNGs remain independent and retain their original proportions.
+const letterRows = [
+  {y: 65, files: [['01_H.png',228,275],['02_A.png',250,275],['03_P.png',206,275],['04_P.png',210,275],['05_Y.png',250,275]]},
+  {y: 405, files: [['06_B.png',201,288],['07_I.png',86,288],['08_R_stripes.png',207,288],['09_T.png',210,288],['10_H.png',216,288],['11_D.png',225,288],['12_A.png',275,288],['13_Y.png',230,288],['14_exclamation_dots.png',98,288]]}
+];
+const letters = [];
+for (const row of letterRows) {
+  const gap = 6, total = row.files.reduce((n, f) => n + f[1], 0) + gap * (row.files.length - 1);
+  let x = (letterWidth - total) / 2;
+  for (const [name, w, h] of row.files) {
+    const image = new Image();
+    // Same PNG pixels as the originals, without their incorrect gamma metadata.
+    const path = 'artwork/ui/happy-birthday-colour-fixed/' + name;
+    const l = {image, cx:x+w/2, cy:row.y+h/2, w, h, baseW:w, baseH:h, x:0, y:0, vx:0, vy:0, angle:0, phase:letters.length * 1.71};
+    letters.push(l);
+    image.onload = () => paintLetters();
+    image.src = path;
+    x += w + gap;
+  }
+}
+let letterPointer = null, letterTouching = false, letterTime = 0;
+function layoutGift() {
+  const w = els.gift.clientWidth, h = els.gift.clientHeight;
+  if (!(w && h)) return;
+  const portrait = w < h * .85;
+  if (portrait !== portraitLetters) {
+    portraitLetters = portrait;
+    letterHeight = portrait ? 1380 : 760;
+    const groups = portrait ? [letters.slice(0,5), letters.slice(5,10), letters.slice(10)] : [letters.slice(0,5), letters.slice(5)];
+    groups.forEach((group, index) => {
+      const scale = portrait ? 1.45 : 1;
+      const gap = 6 * scale;
+      const total = group.reduce((sum, l) => sum + l.baseW * scale, 0) + gap * (group.length - 1);
+      let x = (letterWidth - total) / 2;
+      for (const l of group) {
+        l.w = l.baseW * scale; l.h = l.baseH * scale;
+        l.cx = x + l.w / 2;
+        l.cy = (portrait ? 65 + index * 425 : letterRows[index].y) + l.h / 2;
+        l.x = l.y = l.vx = l.vy = l.angle = 0;
+        x += l.w + gap;
+      }
+    });
+    letterPointer = null;
+  }
+  const contentW = w * .92, contentH = h * .92;
+  const galleryHeight = Math.min(contentW * .54, contentH * .42, 380);
+  const gap = Math.min(20, Math.max(4, h * .02));
+  const bannerWidth = Math.min(contentW * .96, 720, Math.max(1, contentH - galleryHeight - gap) * letterWidth / letterHeight);
+  letterCanvas.parentElement.style.width = bannerWidth + 'px';
+  els.space.style.height = galleryHeight + 'px';
+  layoutGallery();
+  paintLetters();
+}
+function paintLetters() {
+  const rect = letterCanvas.getBoundingClientRect();
+  if (!rect.width) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(1, Math.round(rect.width * dpr));
+  const height = Math.max(1, Math.round(width * letterHeight / letterWidth));
+  if (letterCanvas.width !== width) letterCanvas.width = width;
+  if (letterCanvas.height !== height) letterCanvas.height = height;
+  letterCtx.setTransform(width / letterWidth, 0, 0, height / letterHeight, 0, 0);
+  letterCtx.clearRect(0, 0, letterWidth, letterHeight);
+  for (const l of letters) {
+    if (!l.image.complete || !l.image.naturalWidth) continue;
+    letterCtx.save();
+    letterCtx.translate(l.cx + l.x, l.cy + l.y);
+    letterCtx.rotate(l.angle);
+    letterCtx.drawImage(l.image, -l.w/2, -l.h/2, l.w, l.h);
+    letterCtx.restore();
+  }
+}
+paintLetters();
+reducedMotion.addEventListener?.('change', event => {
+  if (!event.matches) return;
+  letterPointer = null;
+  for (const l of letters) l.x=l.y=l.vx=l.vy=l.angle=0;
+  paintLetters();
+});
+function updateLetters(dt) {
+  if (reducedMotion.matches) return;
+  const rect = letterCanvas.getBoundingClientRect();
+  if (!rect.width) return;
+  const step = Math.min(dt, .033), unitsPerPixel = letterWidth / rect.width;
+  const maxTravel = clamp(rect.width * .055, 16, 32) * unitsPerPixel, radius = clamp(rect.width * .22, 62, 110) * unitsPerPixel;
+  letterTime += step;
+  for (const l of letters) {
+    const idle = l.phase + letterTime * .85;
+    let tx = Math.sin(idle * .75) * 2.3 * unitsPerPixel;
+    let ty = Math.sin(idle) * 3.8 * unitsPerPixel;
+    let tilt = Math.sin(idle * .8) * .025;
+    if (letterPointer) {
+      const dx = l.cx + l.x - letterPointer.x, dy = l.cy + l.y - letterPointer.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < radius) {
+        const force = maxTravel * Math.pow(1 - dist / radius, 2);
+        tx += force * (dist > 1 ? dx / dist : 0);
+        ty += force * (dist > 1 ? dy / dist : -1);
+        tilt += (dist > 1 ? dx / dist : 0) * .10 * Math.pow(1 - dist / radius, 2);
+      }
+    }
+    const margin = Math.max(l.w, l.h) * .08;
+    tx = clamp(tx, margin + l.w / 2 - l.cx, letterWidth - margin - l.w / 2 - l.cx);
+    ty = clamp(ty, margin + l.h / 2 - l.cy, letterHeight - margin - l.h / 2 - l.cy);
+    l.vx = (l.vx + (tx - l.x) * 75 * step) * Math.exp(-14 * step);
+    l.vy = (l.vy + (ty - l.y) * 75 * step) * Math.exp(-14 * step);
+    l.x += l.vx * step; l.y += l.vy * step;
+    l.angle += (tilt - l.angle) * (1 - Math.exp(-9 * step));
+  }
+  paintLetters();
+}
+function layoutGallery() {
+  if (!galleryCards) galleryCards = makeGallery();
+  const w = els.space.clientWidth, h = els.space.clientHeight;
+  if (!(w && h)) return;
+  const radius = Math.min(w * .30, h * .32);
+  const size = Math.min(w * .37, h * .62, 290);
+  for (const [index, card] of galleryCards.entries()) {
+    const angle = (index - galleryTurn) * Math.PI * 2 / galleryCards.length;
+    const front = (Math.cos(angle) + 1) / 2;
+    const width = size, height = size * 1.31;
+    card.style.width = width + 'px';
+    card.style.height = height + 'px';
+    card.style.zIndex = String(Math.round(front * 100));
+    card.style.transform = 'translate(' + (w / 2 + Math.sin(angle) * radius - width / 2) + 'px,' + (h / 2 - (1-front) * 12 - height / 2) + 'px) scale(' + (.60 + .40 * front) + ') rotate(' + ([-4, 2, -1, 4, 1][index]) + 'deg)';
+  }
+}
+els.space.addEventListener('pointerdown', e => { if (e.button !== 0) return; galleryVelocity=0; galleryTarget=galleryTurn; galleryDrag = {x:e.clientX, start:galleryTurn, lastX:e.clientX, lastTime:e.timeStamp, moved:false}; });
+els.space.addEventListener('pointermove', e => { if (!galleryDrag) return; const dx=e.clientX-galleryDrag.x; if (Math.abs(dx)>5 && !galleryDrag.moved) { galleryDrag.moved=true; try { els.space.setPointerCapture(e.pointerId); } catch (_) {} } if (galleryDrag.moved) { const elapsed=Math.max(1,e.timeStamp-galleryDrag.lastTime); galleryVelocity=clamp(-(e.clientX-galleryDrag.lastX)/140*1000/elapsed,-8,8); galleryDrag.lastX=e.clientX; galleryDrag.lastTime=e.timeStamp; galleryTurn=galleryDrag.start-dx/140; layoutGallery(); } });
+function finishGalleryDrag() { if (!galleryDrag) return; gallerySuppressClick=galleryDrag.moved; galleryTarget=Math.round(galleryTurn + clamp(galleryVelocity*.12,-1,1)); if (!galleryDrag.moved) galleryVelocity=0; galleryDrag=null; if (reducedMotion.matches) {galleryTurn=galleryTarget;galleryVelocity=0;} layoutGallery(); }
+els.space.addEventListener('pointerup', finishGalleryDrag);
+els.space.addEventListener('pointercancel', finishGalleryDrag);
+els.space.addEventListener('click', e => { if (gallerySuppressClick) { e.preventDefault(); e.stopImmediatePropagation(); gallerySuppressClick=false; } }, true);
+letterCanvas.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' || reducedMotion.matches) return;
+  letterTouching = true;
+  const r=letterCanvas.getBoundingClientRect();
+  if (r.width && r.height) letterPointer={x:(e.clientX-r.left)*letterWidth/r.width, y:(e.clientY-r.top)*letterHeight/r.height};
+});
+for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) letterCanvas.addEventListener(event, () => { letterTouching=false; letterPointer=null; });
+els.gift.addEventListener('pointermove', e => {
+  if ((e.pointerType !== 'mouse' && !letterTouching) || reducedMotion.matches) { letterPointer = null; return; }
+  const r = letterCanvas.getBoundingClientRect();
+  if (!r.width || !r.height || e.clientX < r.left - 65 || e.clientX > r.right + 65 || e.clientY < r.top - 65 || e.clientY > r.bottom + 65) { letterPointer = null; return; }
+  letterPointer = {x: (e.clientX-r.left)*letterWidth/r.width, y: (e.clientY-r.top)*letterHeight/r.height};
+});
+els.gift.addEventListener('pointerleave', () => { letterPointer = null; });
+function enterGift() {
+  starry.pause();
+  phase = 'gift';
+  phaseTime = orbitTime = galleryTurn = galleryTarget = galleryVelocity = 0;
+  giftAudioStarted = false;
+  popPlayed = false;
+  blowTime = 0;
+  els.gift.hidden = false;
+  layoutGift();
+  paperCtx.resetTransform();
+  paperCtx.clearRect(0, 0, els.confetti.width, els.confetti.height);
+  const shades = ['#f2b1c2', '#a9c8d1', '#f6dfa9', '#faf0d6'];
+  paper = Array.from({length: reducedMotion.matches ? 5 : 24}, (_, i) => ({
+    x: 62 + (i * 97) % 297, y: 146 + (i * 19) % 99,
+    vx: (i % 7 - 3) * 18, vy: 43 + (i * 17) % 62, angle: i * .9, color: shades[i % 4]
+  }));
+  layoutGallery();
+  syncGiftAudio();
+  els.space.focus({preventScroll: true});
+  updateHUD();
+}
+function updateGallery(dt) {
+  updateLetters(dt);
+  if (!galleryDrag && els.view.hidden && !reducedMotion.matches) {
+    const step = Math.min(dt, .033) * 60;
+    galleryVelocity += (galleryTarget - galleryTurn) * 12 * step;
+    galleryVelocity *= Math.pow(.78, step);
+    galleryTurn += galleryVelocity * step / 60;
+    if (Math.abs(galleryTarget-galleryTurn)<.001 && Math.abs(galleryVelocity)<.01) { galleryTurn=galleryTarget; galleryVelocity=0; }
+  }
+  layoutGallery();
+  const time = phaseTime - .24;
+  if (!popPlayed && time >= 0) {
+    popPlayed = true;
+    if (soundOn) { popTrack.currentTime = 0; popTrack.play().catch(() => partyPop()); }
+  }
+  if (paper.length && time >= 0) {
+    paperCtx.resetTransform();
+    paperCtx.clearRect(0, 0, els.confetti.width, els.confetti.height);
+    const {scale, dpr, left, top} = viewport;
+    paperCtx.setTransform(scale * dpr, 0, 0, scale * dpr, left * dpr, top * dpr);
+    if (time < 1.6) {
+      for (const [i, piece] of paper.entries()) {
+        paperCtx.save();
+        paperCtx.globalAlpha = .8 * (1 - smooth(time / 1.6));
+        const d = reducedMotion.matches ? 0 : time;
+        paperCtx.translate(piece.x + piece.vx * d, piece.y + piece.vy * d + 36 * d * d);
+        paperCtx.rotate(piece.angle + d * (i % 2 ? 1.4 : -1.4));
+        paperCtx.fillStyle = piece.color;
+        paperCtx.fillRect(-2, -4, i % 3 ? 4 : 6, i % 3 ? 9 : 5);
+        paperCtx.restore();
+      }
+    } else {
+      paper = [];
+    }
+  }
+  if (!giftAudioStarted && time > .18) {
+    giftAudioStarted = true;
+    syncGiftAudio();
+    if (soundOn) musicBox.play().catch(() => {});
+  }
+}
+function update(dt) {
+  phaseTime += dt;
+  if (dialogueEffect) { dialogueEffect.time += dt; if (dialogueEffect.time >= .36) dialogueEffect = null; }
+  updateParticles(dt);
+  if (phase === 'playing') simulate(dt);
+  else if (phase === 'night' && phaseTime >= (reducedMotion.matches ? .45 : nightDuration)) enterConstellation();
+  else if (phase === 'connected' && phaseTime > .69) enterScene();
+  else if (phase === 'hop' && phaseTime > (reducedMotion.matches ? .22 : 1.82)) enterCake();
+  else if (phase === 'cake') updateCake(dt);
+  else if (phase === 'extinguish') {
+    starry.volume = .23 * (1 - smooth(phaseTime / .66));
+    if (phaseTime >= 1.70) enterGift();
+  } else if (phase === 'gift') updateGallery(dt);
+}
+function draw(t) {
+  const {width, height, scale, left, top, dpr, sceneW, sceneH} = viewport;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  if (['intro','playing','night'].includes(phase)) {
+    const field = ctx.createRadialGradient(width / 2, height / 2, 0,
+      width / 2, height / 2, Math.max(width, height) * .74);
+    field.addColorStop(0, '#dce8d8');
+    field.addColorStop(1, '#eceddf');
+    ctx.fillStyle = field;
+    ctx.fillRect(0, 0, width, height);
+    ctx.save();
+    ctx.translate(left, top);
+    ctx.scale(scale, scale);
+    drawPlaying(t);
+    ctx.restore();
+    if (phase === 'night') {
+      const progress = clamp(phaseTime / (reducedMotion.matches ? .45 : nightDuration), 0, 1);
+      document.body.style.setProperty('--dusk', String(smooth(progress)));
+      ctx.scale(scale, scale);
+      ctx.save();
+      ctx.globalAlpha = smooth(progress / .79);
+      drawSky(false, 0);
+      ctx.restore();
+      drawSkyStars(false, smooth((progress - .29) / .51));
+      drawConstellation(t, smooth((progress - .53) / .47));
+    }
+    return;
+  }
+  ctx.scale(scale, scale);
+  if (phase === 'constellation' || phase === 'connected') {
+    drawSky();
+    drawConstellation(t);
+    if (phase === 'connected') {
+      ctx.fillStyle = 'rgba(28,43,55,' + smooth(phaseTime / .69) + ')';
+      ctx.fillRect(0, 0, sceneW, sceneH);
+    }
+  } else if (phase !== 'gift') drawStory(t);
+}
+
+els.next.addEventListener('pointerdown', e => {
+  if (phase !== 'cake' || !e.isPrimary || e.button !== 0) return;
+  holding = true;
+  els.next.setPointerCapture(e.pointerId);
+});
+for (const type of ['pointerup','pointercancel','lostpointercapture','blur']) {
+  els.next.addEventListener(type, () => { holding = false; });
+}
+window.addEventListener('blur', () => { holding = false; });
+els.next.addEventListener('keydown', e => {
+  if (phase === 'cake' && (e.key === ' ' || e.key === 'Enter')) {
+    e.preventDefault();
+    holding = true;
+  }
+});
+els.next.addEventListener('keyup', e => {
+  if (e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    holding = false;
+  }
+});
+els.next.addEventListener('click', e => {
+  if (phase === 'cake' && e.detail === 0) {
+    blow = clamp(blow + .17, 0, 1);
+    updateBlowProgress();
+    if (blow === 1) extinguish();
+  }
+});
+els.mic.addEventListener('click', async () => {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    els.caption.textContent = '也可以按住按钮吹蜡烛。';
+    return;
+  }
+  const request = ++micRequest;
+  const MicContext = window.AudioContext || window.webkitAudioContext;
+  if (!MicContext) return;
+  els.mic.disabled = true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    if (request !== micRequest || phase !== 'cake') {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    micStream = stream;
+    micCtx = new MicContext();
+    micAnalyser = micCtx.createAnalyser();
+    micAnalyser.fftSize = 512;
+    micSamples = new Uint8Array(micAnalyser.fftSize);
+    micCtx.createMediaStreamSource(stream).connect(micAnalyser);
+    await micCtx.resume();
+    if (request === micRequest) els.mic.textContent = '麦克风已开启';
+  } catch {
+    if (request === micRequest) {
+      stopMic();
+      els.caption.textContent = '可以按住按钮吹蜡烛。';
+      els.mic.disabled = false;
+    }
+  }
+});
+function tick(now){let dt=lastTime?Math.min((now-lastTime)/1000,.033):.016;lastTime=now;update(dt);draw(now/1000);requestAnimationFrame(tick)}
+function pointer(e, field = false) {
+  const rect = canvas.getBoundingClientRect();
+  const {left, top, scale} = viewport;
+  return {
+    x: (e.clientX - rect.left - (field ? left : 0)) / scale,
+    y: (e.clientY - rect.top - (field ? top : 0)) / scale
+  };
+}
+function clearDrag() {
+  if (!drag) return;
+  const {id} = drag;
+  drag = null;
+  if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+  updateStatus();
+}
+canvas.addEventListener('pointerdown', e => {
+  if (!e.isPrimary || e.button !== 0) return;
+  if (phase === 'constellation') {
+    e.preventDefault();
+    const [x, y] = constellationTarget();
+    const p = pointer(e);
+    if (Math.hypot(p.x - x, p.y - y) < 24) lightNextStar();
+    return;
+  }
+  if (phase !== 'playing' || !ready || drag) return;
+  const p = pointer(e, true);
+  if (p.x < 0 || p.x > fieldWidth || p.y < 0 || p.y > fieldHeight) return;
+  const index = cats.findIndex(c => canPull(c) && Math.hypot(p.x - c.x, p.y - c.y) < c.r + 16);
+  if (index < 0) return;
+  e.preventDefault();
+  drag = {index, dx: 0, dy: 0, id: e.pointerId, startX: p.x, startY: p.y, clientX: e.clientX, clientY: e.clientY};
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* Window events still own this drag. */ }
+  updateStatus();
+});
+function updateDragPosition(e) {
+  if (!drag || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
+  const p = pointer(e, true);
+  const dx = p.x - drag.startX, dy = p.y - drag.startY;
+  const ratio = Math.min(1, maxPull / (Math.hypot(dx, dy) || 1));
+  drag.dx = dx * ratio;
+  drag.dy = dy * ratio;
+  drag.clientX = e.clientX;
+  drag.clientY = e.clientY;
+}
+window.addEventListener('pointermove', e => {
+  if (e.pointerId !== drag?.id) return;
+  updateDragPosition(e);
+  if (e.pointerType === 'mouse' && typeof e.buttons === 'number' && !(e.buttons & 1)) {
+    release(e);
+    return;
+  }
+  e.preventDefault();
+}, {capture: true, passive: false});
+function release(e) {
+  if (e.pointerId !== drag?.id) return;
+  if (e.type === 'pointerup') updateDragPosition(e);
+  e.preventDefault();
+  const {index, dx, dy} = drag;
+  clearDrag();
+  const c = cats[index], distance = Math.hypot(dx, dy);
+  if (phase !== 'playing' || !ready || distance < 12) return;
+  const speed = Math.min(distance / maxPull, 1) * 790;
+  c.vx = -dx / distance * speed;
+  c.vy = -dy / distance * speed;
+  c.spin = R(-2.6, 2.6);
+  c.wobble = .2;
+  ready = false;
+  stillElapsed = roundElapsed = 0;
+  hadImpact = false;
+  lastLaunched = index;
+  shotCount++;
+  sound(250 + speed * .3, .13, 'triangle', .046);
+  updateHUD();
+}
+window.addEventListener('pointerup', release, {capture: true});
+function cancelDrag(e) {
+  if (e.pointerId === drag?.id) clearDrag();
+}
+window.addEventListener('pointercancel', cancelDrag, {capture: true});
+window.addEventListener('pointerout', e => {
+  if (e.pointerId === drag?.id && !e.relatedTarget && !canvas.hasPointerCapture(e.pointerId)) release(e);
+});
+// A browser can release capture before the window receives pointerup.
+// Finish with the last displayed pull; clearDrag nulls drag before voluntarily
+// releasing capture, so the normal pointerup path cannot launch twice.
+canvas.addEventListener('lostpointercapture', release);
+window.addEventListener('blur', clearDrag);
+window.addEventListener('pagehide', clearDrag);
+document.addEventListener('visibilitychange', () => { if (document.hidden) clearDrag(); });
+canvas.addEventListener('click', e => {
+  if (phase !== 'scene' || e.button > 0) return;
+  advanceStory();
+});
+canvas.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (phase === 'constellation' || phase === 'scene') {
+    e.preventDefault();
+    if (!e.repeat) {
+      if (phase === 'scene') advanceStory();
+      else lightNextStar();
+    }
+  }
+});
+byId('start').addEventListener('click', () => {
+  init();
+  canvas.focus({preventScroll: true});
+});
+byId('reset').addEventListener('click', () => {
+  clearEnding();
+  clearDrag();
+  els.start.hidden = false;
+  phase = 'intro'; score = 0; round = 1; ready = true; drag = null;
+  particles = []; floaters = []; seed = 7;
+  initPreview();
+  updateHUD();
+});
+function initPreview() {
+  cats = [
+    {x:92/W*fieldWidth,y:420/H*fieldHeight,vx:0,vy:0,spin:0,angle:0,r:30,wobble:0,c:colors[0],img:'cat_a'},
+    {x:297/W*fieldWidth,y:232/H*fieldHeight,vx:0,vy:0,spin:0,angle:0,r:30,wobble:0,c:colors[1],img:'cat_b'},
+    {x:290/W*fieldWidth,y:483/H*fieldHeight,vx:0,vy:0,spin:0,angle:0,r:30,wobble:0,c:colors[2],img:'cat_c'}
+  ];
+  items = [];
+  for (let i = 0; i < 10; i++) spawnItem();
+}
+byId('sound').addEventListener('click', e => {
+  soundOn = !soundOn;
+  e.currentTarget.setAttribute('aria-pressed', String(soundOn));
+  e.currentTarget.setAttribute('aria-label', soundOn ? '关闭声音' : '开启声音');
+  e.currentTarget.title = soundOn ? '关闭声音' : '开启声音';
+  starry.muted = birthday.muted = ukulele.muted = musicBox.muted = popTrack.muted = !soundOn;
+  if (soundOn) {
+    sound();
+    if (['scene', 'hop', 'cake'].includes(phase) && starry.paused) playTrack(starry, els.nightAudio);
+    if (phase === 'gift' && giftAudioStarted && musicBox.paused) musicBox.play().catch(() => {});
+  } else {
+    els.nightAudio.hidden = true;
+    syncGiftAudio();
+  }
+});
+els.nightAudio.addEventListener('click', () => playTrack(starry, els.nightAudio));
+function closeViewer(restoreFocus = true) {
+  if (els.view.hidden) return;
+  els.view.hidden = true;
+  els.gift.inert = false;
+  if (restoreFocus) openCard?.focus({preventScroll: true});
+  openCard = null;
+}
+byId('closeArt').addEventListener('click', () => closeViewer());
+document.addEventListener('keydown', e => {
+  if (els.view.hidden || (e.key !== 'Escape' && e.key !== 'Tab')) return;
+  e.preventDefault();
+  if (e.key === 'Escape') closeViewer();
+  else byId('closeArt').focus();
+});
+new ResizeObserver(resizeStage).observe(stage);
+window.addEventListener('resize', resizeStage);
+resizeStage();
+initPreview();
+updateHUD();
+const preview = new URLSearchParams(location.search).get('preview');
+if (['dusk', 'ending', 'story', 'cake', 'cake-left', 'gift'].includes(preview)) {
+  init();
+  score = 1119;
+  if (preview === 'dusk') { phase = 'night'; phaseTime = 0; updateHUD(); }
+  if (preview === 'ending') enterConstellation();
+  if (preview === 'story') enterScene();
+  if (preview === 'cake') enterCake();
+  if (preview === 'cake-left') { enterCake(); blow = .35; blowTime = .125; previewLockedCake = true; updateBlowProgress(); }
+  if (preview === 'gift') enterGift();
+}
+requestAnimationFrame(tick);
+})();
+</script></body></html>
