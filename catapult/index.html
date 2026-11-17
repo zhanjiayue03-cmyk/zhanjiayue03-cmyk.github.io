@@ -70,10 +70,11 @@
   .overlay[hidden], .story-actions[hidden], .gift[hidden], .tip[hidden] { display: none !important; }
   .welcome {
     width: max-content; max-width: 100%; display: grid; justify-items: center; gap: 12px;
-    padding: 16px 19px; border: 1px solid var(--field-edge); border-radius: 18px;
+    padding: 16px 19px; border: 0; border-radius: 18px;
     background: #fff8ec; box-shadow: 0 4px 14px #46504314;
   }
   .welcome p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  #start { border: 0; }
   .action {
     min-height: 42px; padding: 8px 20px; color: var(--ink); border: 1px solid #a4b29a;
     border-radius: 99px; background: #d9dfc6; font-weight: 750;
@@ -142,7 +143,8 @@
   .story-caption { color: #fff5df; font-size: 12px; font-weight: 700; }
   .story-caption:empty { display: none; }
   .story-actions [hidden], .gift [hidden], .smallbutton[hidden] { display: none; }
-  .hold { touch-action: none; user-select: none; }
+  .hold { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .stage-wrap { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   .blowbar { width: min(42%, 170px); height: 5px; background: #233f50; border-radius: 99px; overflow: hidden; }
   .blowfill { background: #e8a9ba; height: 100%; width: 0; border-radius: 99px; }
   .mic-btn {
@@ -319,6 +321,10 @@ function updateHUD() {
   updateStatus();
 }
 function sound(freq=430,len=.07,type='sine',vol=.045){if(!soundOn)return;try{audioCtx??=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();let o=audioCtx.createOscillator(),g=audioCtx.createGain(),now=audioCtx.currentTime;o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(vol,now);g.gain.exponentialRampToValueAtTime(.0001,now+len);o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+len+.005)}catch(_){}}
+// Unlock synthesized effects while a real user gesture is still active.
+function unlockEffects(){if(!soundOn)return;try{audioCtx??=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume().catch(()=>{});}catch(_){}}
+document.addEventListener('pointerdown', unlockEffects, {capture:true});
+document.addEventListener('keydown', unlockEffects, {capture:true});
 // A soft synthesized pop and paper rustle works offline.
 function partyPop(){if(!soundOn)return;try{audioCtx??=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();const n=Math.floor(audioCtx.sampleRate*.48),buffer=audioCtx.createBuffer(1,n,audioCtx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<n;i++){const t=i/audioCtx.sampleRate;data[i]=(Math.random()*2-1)*(Math.exp(-t*42)*.65+Math.exp(-t*9)*.12);}const source=audioCtx.createBufferSource(),filter=audioCtx.createBiquadFilter(),gain=audioCtx.createGain();source.buffer=buffer;filter.type='highpass';filter.frequency.value=650;gain.gain.value=.25;source.connect(filter);filter.connect(gain);gain.connect(audioCtx.destination);source.start();}catch(_){}}
 function puff(x,y,color,n=6){for(let i=0;i<n;i++){const ang=R(0,Math.PI*2),v=R(25,135);particles.push({x,y,vx:Math.cos(ang)*v,vy:Math.sin(ang)*v,life:R(.35,.8),max:.8,color,size:R(2.5,5)})}}
@@ -575,6 +581,7 @@ let storyStep = 0, nodeCount = 0, blow = 0, blowTime = 0, holding = false;
 let dialogueEffect = null;
 let previewLockedCake = false;
 let micRequest = 0, micStream = null, micAnalyser = null, micCtx = null, micSamples = null;
+let micNoiseFloor = .004;
 let orbitTime = 0, openCard = null, paper = [], giftAudioStarted = false, popPlayed = false;
 const paperCtx = els.confetti.getContext('2d');
 
@@ -1064,6 +1071,7 @@ function stopMic() {
   if (micStream) micStream.getTracks().forEach(track => track.stop());
   micCtx?.close().catch(() => {});
   micStream = micAnalyser = micCtx = micSamples = null;
+  micNoiseFloor = .004;
 }
 function clearEnding() {
   musicGeneration++;
@@ -1139,7 +1147,10 @@ function micIsBlowing() {
   micAnalyser.getByteTimeDomainData(micSamples);
   let square = 0;
   for (const sample of micSamples) square += ((sample - 128) / 128) ** 2;
-  return Math.sqrt(square / micSamples.length) > .072;
+  const level = Math.sqrt(square / micSamples.length);
+  const threshold = Math.max(.014, Math.min(.045, micNoiseFloor * 2.5));
+  if (level < threshold) micNoiseFloor = micNoiseFloor * .98 + level * .02;
+  return level > threshold;
 }
 function updateCake(dt) {
   starry.volume = lerp(.46, .23, smooth(phaseTime / .45));
@@ -1458,6 +1469,7 @@ function draw(t) {
   } else if (phase !== 'gift') drawStory(t);
 }
 
+els.next.addEventListener('contextmenu', e => { if (phase === 'cake') e.preventDefault(); });
 els.next.addEventListener('pointerdown', e => {
   if (phase !== 'cake' || !e.isPrimary || e.button !== 0) return;
   holding = true;
@@ -1496,7 +1508,7 @@ els.mic.addEventListener('click', async () => {
   if (!MicContext) return;
   els.mic.disabled = true;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    const stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
     if (request !== micRequest || phase !== 'cake') {
       stream.getTracks().forEach(track => track.stop());
       return;
