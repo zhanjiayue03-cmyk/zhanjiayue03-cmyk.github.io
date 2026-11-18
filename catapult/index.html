@@ -570,7 +570,7 @@ const musicBox = new Audio();
 const ukulele = new Audio();
 const popTrack = new Audio();
 popTrack.src = endingAssets.partyPop; popTrack.preload = 'auto';
-musicBox.src = endingAssets.musicBox; musicBox.loop = true; musicBox.volume = .35;
+musicBox.src = endingAssets.musicBox; musicBox.loop = true; musicBox.volume = .35; musicBox.preload = 'auto';
 ukulele.src = endingAssets.birthdaySecond;
 const birthday = new Audio();
 starry.preload = birthday.preload = 'none';
@@ -587,6 +587,7 @@ let previewLockedCake = false;
 let micRequest = 0, micStream = null, micAnalyser = null, micCtx = null, micSamples = null;
 let micNoiseFloor = .004;
 let orbitTime = 0, openCard = null, paper = [], giftAudioStarted = false, popPlayed = false;
+let giftMusicPrimed = false, giftMusicPriming = false;
 const paperCtx = els.confetti.getContext('2d');
 
 // Scorpius follows the layered reference. The selected checkpoints keep the original seven taps.
@@ -1075,9 +1076,32 @@ function playTrack(track, fallback) {
 }
 function resumeSceneMusic() {
   if (soundOn && ['scene', 'hop', 'cake'].includes(phase) && starry.paused) playTrack(starry, els.nightAudio);
+  if (soundOn && phase === 'gift' && giftAudioStarted && musicBox.paused && !giftMusicPriming) {
+    musicBox.play().catch(() => {});
+  }
 }
 window.addEventListener('pointerdown', resumeSceneMusic);
 window.addEventListener('keydown', resumeSceneMusic);
+// Prepare ending audio during the user's microphone-enabling gesture.
+function primeGiftMusic() {
+  if (!soundOn || giftMusicPrimed || giftMusicPriming || phase !== 'cake') return;
+  const generation = musicGeneration;
+  giftMusicPriming = true;
+  musicBox.volume = 0;
+  musicBox.play().then(() => {
+    giftMusicPriming = false;
+    if (generation !== musicGeneration) { musicBox.pause(); musicBox.volume = .35; return; }
+    giftMusicPrimed = true;
+    if (phase !== 'gift' || !giftAudioStarted) {
+      musicBox.pause();
+      musicBox.currentTime = 0;
+    }
+    musicBox.volume = .35;
+  }).catch(() => {
+    giftMusicPriming = false;
+    musicBox.volume = .35;
+  });
+}
 function stopMic() {
   micRequest++;
   if (micStream) micStream.getTracks().forEach(track => track.stop());
@@ -1538,6 +1562,7 @@ els.mic.addEventListener('click', async () => {
     els.caption.textContent = '也可以按住按钮吹蜡烛。';
     return;
   }
+  primeGiftMusic();
   const request = ++micRequest;
   const MicContext = window.AudioContext || window.webkitAudioContext;
   if (!MicContext) return;
