@@ -135,11 +135,14 @@
   .app[data-phase="gift"] .number { font-size: clamp(22.8px, 5.76vw, 50.4px); }
   .app[data-phase="gift"] .legend, .app[data-phase="gift"] .progress { display: none; }
   .app[data-scene="night"] :focus-visible { outline-color: #eeddac; }
+  .app[data-scene="night"] #world:focus { outline: none; }
   .story-actions {
     position: absolute; z-index: 3; inset: auto 0 2% 0; display: grid;
     justify-items: center; gap: 4px; padding: 0 12px; pointer-events: none;
   }
   .story-actions button { pointer-events: auto; }
+  .story-actions .hold, .story-actions .mic-btn { border: 0; }
+  #nightAudio { display: none !important; }
   .story-caption { color: #fff5df; font-size: 12px; font-weight: 700; }
   .story-caption:empty { display: none; }
   .story-actions [hidden], .gift [hidden], .smallbutton[hidden] { display: none; }
@@ -277,13 +280,13 @@ const src = {
   cat_b: 'artwork/cats/cat-b.png',
   cat_c: 'artwork/cats/cat-c.png',
   can: 'artwork/ui/can.png', canYellow: 'artwork/ui/can-yellow.png', yarn: 'artwork/ui/yarn.png',
-  green_idle: 'artwork/characters/new/me-idle.png', green_cake: 'artwork/characters/new/me-cake-warm.png',
+  green_idle: 'artwork/characters/new/me-idle-preview.png', green_cake: 'artwork/characters/new/me-cake-warm-no-flame-preview.png',
   green_flame_repair: 'artwork/characters/new/me-cake-warm-flame-repair.png',
-  green_cool: 'artwork/characters/new/me-cake-cool.png',
-  black_idle: 'artwork/characters/new/friend-idle.png', black_hat: 'artwork/characters/new/friend-warm.png',
-  black_cool: 'artwork/characters/new/friend-cool.png',
-  blowReady: 'artwork/characters/new/friend-blow-closed-v2.png',
-  blowing: 'artwork/characters/new/friend-blow-open-v2.png',
+  green_cool: 'artwork/characters/new/me-cake-cool-preview.png',
+  black_idle: 'artwork/characters/new/friend-idle-preview.png', black_hat: 'artwork/characters/new/friend-warm-preview.png',
+  black_cool: 'artwork/characters/new/friend-cool-preview.png',
+  blowReady: 'artwork/characters/new/friend-expression-closed.png',
+  blowing: 'artwork/characters/new/friend-expression-open.png',
   flame: 'artwork/ui/candle-flame.png'
 };
 const images = {};
@@ -371,10 +374,10 @@ function drawPaper() {
   ctx.fillStyle = '#c2d2bc';
   for (let x = 23; x < fieldWidth; x += 42) {
     ctx.beginPath();
-    ctx.arc(x, 10, 13, 0, Math.PI);
+    ctx.arc(x, 5, 13, 0, Math.PI);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(x, fieldHeight - 10, 13, Math.PI, Math.PI * 2);
+    ctx.arc(x, fieldHeight - 5, 13, Math.PI, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -537,14 +540,14 @@ function resizeStage() {
   if (phase === 'gift') { layoutGift(); }
 }
 const portraits = {
-  green_idle: {footX: 462.5, footY: 1700, scale: .155},
-  green_cake: {footX: 436, footY: 1804, scale: .154},
-  green_cool: {footX: 436, footY: 1802, scale: .1542},
-  black_idle: {footX: 431.5, footY: 1823, scale: .170},
-  black_hat: {footX: 391.5, footY: 2003, scale: .1735},
-  black_cool: {footX: 391.5, footY: 2003, scale: .1735},
-  blowReady: {footX: 405.5, footY: 1896, scale: .182},
-  blowing: {footX: 405.5, footY: 1896, scale: .182}
+  green_idle: {footX: 420, footY: 1118, scale: .242},
+  green_cake: {footX: 560, footY: 1630, scale: .170},
+  green_cool: {footX: 350, footY: 1170, scale: .236},
+  black_idle: {footX: 300, footY: 1120, scale: .278},
+  black_hat: {footX: 381, footY: 1138, scale: .305},
+  black_cool: {footX: 290, footY: 1138, scale: .305},
+  blowReady: {footX: 535, footY: 1605, scale: .216},
+  blowing: {footX: 535, footY: 1605, scale: .216}
 };
 
 // Set paths here when a recording or additional hand-drawn pose is ready.
@@ -578,6 +581,7 @@ let birthdayAvailable = Boolean(endingAssets.birthdayFlute);
 let birthdayPart = 0;
 let musicGeneration = 0;
 let storyStep = 0, nodeCount = 0, blow = 0, blowTime = 0, holding = false;
+let breathLean = 0, breathVelocity = 0, breathActive = false, openPoseRemaining = 0;
 let dialogueEffect = null;
 let previewLockedCake = false;
 let micRequest = 0, micStream = null, micAnalyser = null, micCtx = null, micSamples = null;
@@ -704,11 +708,6 @@ function drawConstellation(t, alpha = 1) {
   const {sceneW: w, sceneH: h} = viewport;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.strokeStyle = '#91ac9d';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.roundRect(2, 2, w - 4, h - 4, 23);
-  ctx.stroke();
   const complete = nodeCount === nodes.length;
   const map = constellationLayout();
   ctx.save();
@@ -753,7 +752,8 @@ function lightNextStar() {
   }
 }
 function storySprite(key, foot) {
-  const img = images[key], {footX, footY, scale} = portraits[key];
+  const img = images[key];
+  const {footX, footY, scale} = portraits[key];
   return {img, x: foot - footX * scale, y: ground - footY * scale,
     w: img.naturalWidth * scale, h: img.naturalHeight * scale};
 }
@@ -839,7 +839,7 @@ function drawPortrait(key, foot, motion = {}, candle = null) {
   if (lightBuffer.height < h) lightBuffer.height = h;
   lightCtx.clearRect(0, 0, w, h);
   lightCtx.drawImage(r.img, 0, 0, w, h);
-  if (key === 'green_cake') {
+  if (key === 'green_cake' && r.img.naturalWidth === 872) {
     // Replace only the old baked-in flame with a feathered, warm-lit repair.
     const patch = repairedWarmHair();
     if (patch) lightCtx.drawImage(patch, 0, 0, 110, 116, 628 / 872 * w, 590 / 1804 * h, 110 / 872 * w, 116 / 1804 * h);
@@ -857,7 +857,15 @@ function drawPortrait(key, foot, motion = {}, candle = null) {
   lightCtx.fillStyle = glow;
   lightCtx.fillRect(0, 0, w, h);
   lightCtx.globalCompositeOperation = 'source-over';
+  ctx.save();
+  if ((key === 'black_hat' || key === 'blowReady' || key === 'blowing') && !reducedMotion.matches) {
+    // A small breathing sway around the feet keeps both poses anchored.
+    ctx.translate(foot, ground);
+    ctx.rotate(-.035 * breathLean);
+    ctx.translate(-foot, -ground);
+  }
   ctx.drawImage(lightBuffer, 0, 0, w, h, r.x, r.y, r.w, r.h);
+  ctx.restore();
 }
 function dialogueBox(cake = false) {
   const w = cake ? 126 : 192;
@@ -944,16 +952,15 @@ function drawStory(t) {
   let flameX, flameY, light = 0;
   if (showingCake) {
     const r = storySprite('green_cake', me);
-    flameX = r.x + 683 * portraits.green_cake.scale;
-    flameY = r.y + 688 * portraits.green_cake.scale;
+    flameX = r.x + 706 * portraits.green_cake.scale;
+    flameY = r.y + 653 * portraits.green_cake.scale;
     light = phase === 'extinguish' ? 1 - smooth(phaseTime / .48)
       : smooth(phaseTime / .32);
   }
-  const candle = showingCake ? {x: flameX, y: flameY, light, cool: phase === 'extinguish' ? smooth(phaseTime / .48) : 0} : null;
-  const breathCycle = blowTime * Math.PI * 4;
-  const actionPose = blowTime < .23 ? 'blowing' : 'blowReady';
+  const candle = showingCake ? {x: flameX - 5 * breathLean, y: flameY, light, cool: phase === 'extinguish' ? smooth(phaseTime / .48) : 0} : null;
+  const actionPose = openPoseRemaining > 0 ? 'blowing' : 'blowReady';
   const friendKey = showingCake
-    ? ((blowTime > 0 || phase === 'extinguish') && images[actionPose]?.naturalWidth ? actionPose : 'black_hat')
+    ? (breathActive && images[actionPose]?.naturalWidth ? actionPose : 'black_hat')
     : 'black_idle';
   if (!showingCake) drawPortrait('green_idle', me, motion);
   const coolMix = phase === 'extinguish' ? smooth(phaseTime / .65) : 0;
@@ -970,9 +977,9 @@ function drawStory(t) {
   if (showingCake && light > 0) {
     ctx.save();
     ctx.translate(flameX, flameY);
-    // Closed-mouth frame: keep the flame visibly tilted left as requested.
-    const lean = blowTime > 0 && actionPose === 'blowReady' ? -.38 - .16 * smooth(blow) : -.54 * smooth(blow);
-    ctx.rotate(lean + (reducedMotion.matches ? 0 : blowTime ? Math.sin(breathCycle) * .08 : Math.sin(t * 3) * .05));
+    // Flame and friend share the same eased lean and spring return.
+    const idleFlicker = reducedMotion.matches ? 0 : Math.sin(t * 3) * .025 * Math.max(0, 1 - Math.abs(breathLean));
+    ctx.rotate(-.48 * breathLean + idleFlicker);
     const size = phase === 'extinguish' ? 0 : smooth(phaseTime / .25);
     if (size > 0 && images.flame.naturalWidth) {
       ctx.globalAlpha = Math.min(1, size * 5);
@@ -1066,6 +1073,11 @@ function playTrack(track, fallback) {
     if (relevant) fallback.hidden = false;
   });
 }
+function resumeSceneMusic() {
+  if (soundOn && ['scene', 'hop', 'cake'].includes(phase) && starry.paused) playTrack(starry, els.nightAudio);
+}
+window.addEventListener('pointerdown', resumeSceneMusic);
+window.addEventListener('keydown', resumeSceneMusic);
 function stopMic() {
   micRequest++;
   if (micStream) micStream.getTracks().forEach(track => track.stop());
@@ -1119,6 +1131,7 @@ function advanceStory() {
 function enterCake() {
   phase = 'cake';
   phaseTime = blow = blowTime = 0;
+  breathLean = breathVelocity = openPoseRemaining = 0; breathActive = false;
   previewLockedCake = false;
   if (starry.paused) playTrack(starry, els.nightAudio);
   holding = false;
@@ -1139,6 +1152,7 @@ function extinguish() {
   phaseTime = 0;
   stopMic();
   holding = false;
+  breathActive = false; openPoseRemaining = 0;
   els.nightAudio.hidden = els.story.hidden = true;
   updateStatus();
 }
@@ -1157,12 +1171,33 @@ function updateCake(dt) {
   if (previewLockedCake && !holding) return;
   previewLockedCake = false;
   const mic = micIsBlowing();
-  if (holding || mic) {
+  const blowingNow = holding || mic;
+  if (blowingNow && !breathActive) openPoseRemaining = .12;
+  else if (blowingNow) openPoseRemaining = Math.max(0, openPoseRemaining - dt);
+  else openPoseRemaining = 0;
+  breathActive = blowingNow;
+  if (blowingNow) {
     blowTime += dt;
     blow = clamp(blow + dt * (holding ? .51 : .57), 0, 1);
     updateBlowProgress();
   } else {
     blowTime = 0;
+  }
+  if (reducedMotion.matches) {
+    breathLean = breathVelocity = 0;
+    if (!blowingNow) blowTime = 0;
+  } else {
+    // Critically damped while leaning; a lightly springy return overshoots
+    // the resting position once before settling, without a looping wobble.
+    const stiffness = blowingNow ? 100 : 160;
+    const damping = blowingNow ? 20 : 15;
+    const target = blowingNow ? 1 : 0;
+    breathVelocity += (stiffness * (target - breathLean) - damping * breathVelocity) * dt;
+    breathLean += breathVelocity * dt;
+    if (!blowingNow && Math.abs(breathLean) < .002 && Math.abs(breathVelocity) < .025) {
+      breathLean = breathVelocity = 0;
+      blowTime = 0;
+    }
   }
   if (blow === 1) extinguish();
 }
